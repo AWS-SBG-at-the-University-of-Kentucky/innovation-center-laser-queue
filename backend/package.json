@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "reset:dev": "tsx scripts/reset-dev.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1147.0",
@@ -12,8 +13,10 @@
     "@aws-sdk/s3-request-presigner": "^3.1147.0"
   },
   "devDependencies": {
+    "@aws-sdk/client-cloudformation": "^3.1147.0",
     "@types/aws-lambda": "^8.10.164",
     "@types/node": "^24.0.0",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }
 }
