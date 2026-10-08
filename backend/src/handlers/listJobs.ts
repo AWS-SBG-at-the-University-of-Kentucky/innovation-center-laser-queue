@@ -1,8 +1,28 @@
+import { ScanCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
-import { error } from "../lib/http.js";
+import { ddb } from "../lib/aws.js";
+import { config } from "../lib/config.js";
+import { json } from "../lib/http.js";
+import type { Job, JobSummary } from "../types.js";
 
 // GET /jobs
-// TODO (Milestone 3): return { jobs } sorted oldest submission first.
 export const handler: APIGatewayProxyHandlerV2 = async () => {
-  return error(501, "GET /jobs is not implemented yet");
+  const items: Job[] = [];
+  let startKey: Record<string, unknown> | undefined;
+  do {
+    const page = await ddb.send(
+      new ScanCommand({
+        TableName: config.tableName,
+        ExclusiveStartKey: startKey,
+      }),
+    );
+    items.push(...((page.Items ?? []) as Job[]));
+    startKey = page.LastEvaluatedKey;
+  } while (startKey);
+
+  const jobs: JobSummary[] = items
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map(({ s3Key: _s3Key, ...summary }) => summary);
+
+  return json(200, { jobs });
 };

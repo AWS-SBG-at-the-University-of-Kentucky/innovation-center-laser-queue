@@ -67,10 +67,21 @@ export class LaserQueueStack extends cdk.Stack {
     table.grantReadData(getDownloadUrl);
     bucket.grantRead(getDownloadUrl);
 
+    const completeJob = handler("CompleteJob", "completeJob.ts");
+    table.grantWriteData(completeJob);
+
+    const deleteJob = handler("DeleteJob", "deleteJob.ts");
+    table.grantReadWriteData(deleteJob);
+    bucket.grantDelete(deleteJob);
+
     const api = new apigwv2.HttpApi(this, "Api", {
       corsPreflight: {
         allowOrigins: ALLOWED_ORIGINS,
-        allowMethods: [apigwv2.CorsHttpMethod.GET, apigwv2.CorsHttpMethod.POST],
+        allowMethods: [
+          apigwv2.CorsHttpMethod.GET,
+          apigwv2.CorsHttpMethod.POST,
+          apigwv2.CorsHttpMethod.DELETE,
+        ],
         allowHeaders: ["content-type"],
       },
     });
@@ -92,6 +103,19 @@ export class LaserQueueStack extends cdk.Stack {
         "GetDownloadUrlIntegration",
         getDownloadUrl,
       ),
+    });
+    api.addRoutes({
+      path: "/jobs/{jobId}/complete",
+      methods: [apigwv2.HttpMethod.POST],
+      integration: new HttpLambdaIntegration(
+        "CompleteJobIntegration",
+        completeJob,
+      ),
+    });
+    api.addRoutes({
+      path: "/jobs/{jobId}",
+      methods: [apigwv2.HttpMethod.DELETE],
+      integration: new HttpLambdaIntegration("DeleteJobIntegration", deleteJob),
     });
 
     // Goes in web/.env.local as VITE_API_URL.

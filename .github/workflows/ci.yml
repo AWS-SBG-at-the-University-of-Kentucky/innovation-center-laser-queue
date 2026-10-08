@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type-check all workspaces
+        run: npm run typecheck
+
+      - name: Build the frontend
+        run: npm run build
+
+      # Needs no AWS credentials; catches CDK and Lambda bundling errors.
+      - name: Synthesize the CDK stack
+        run: npm run synth -- --quiet
