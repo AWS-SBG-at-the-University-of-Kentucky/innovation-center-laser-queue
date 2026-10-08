@@ -5,6 +5,7 @@ import {
   createJob,
   uploadFile,
 } from "../api";
+import { PresenceNotice } from "../components/PresenceNotice";
 import {
   AlertIcon,
   AnimatedCheck,
@@ -119,6 +120,8 @@ export function SubmitPage() {
         <h1>Innovation Center Laser Queue</h1>
         <p>Submit a file for laser cutting.</p>
       </header>
+
+      <PresenceNotice />
 
       {status.state === "success" ? (
         <section className="card success-panel" role="status">
@@ -269,6 +272,18 @@ export function SubmitPage() {
                 "Submit Job"
               )}
             </button>
+
+            <p className="help-text">
+              Don't have Adobe Illustrator? Download it from{" "}
+              <a
+                href="https://luky.sharepoint.com/sites/downloads/SitePages/Adobe-Creative-Cloud.aspx"
+                target="_blank"
+                rel="noreferrer"
+              >
+                UK Downloads
+              </a>
+              .
+            </p>
           </form>
         </section>
       )}

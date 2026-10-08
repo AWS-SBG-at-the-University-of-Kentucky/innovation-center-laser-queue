@@ -1,4 +1,4 @@
-export const ALLOWED_EXTENSIONS = ["ai", "pdf", "svg"] as const;
+export const ALLOWED_EXTENSIONS = ["ai"] as const;
 export type FileExtension = (typeof ALLOWED_EXTENSIONS)[number];
 
 export type JobStatus = "QUEUED" | "COMPLETED";

@@ -445,6 +445,28 @@ small {
   border-color: color-mix(in srgb, var(--danger) 30%, transparent);
 }
 
+.notice.info {
+  background: var(--primary-soft);
+  color: var(--primary-text);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.hero + .notice,
+.page-header + .notice {
+  margin-bottom: 1.5rem;
+}
+
+.help-text {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.help-text a {
+  color: var(--primary-text);
+}
+
 main.wide > .notice {
   margin-bottom: 1rem;
 }

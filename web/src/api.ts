@@ -1,5 +1,5 @@
 // Mirrors backend/src/types.ts — keep the two in sync.
-export const ALLOWED_EXTENSIONS = ["ai", "pdf", "svg"] as const;
+export const ALLOWED_EXTENSIONS = ["ai"] as const;
 export type FileExtension = (typeof ALLOWED_EXTENSIONS)[number];
 
 // Mirrors MAX_FILE_SIZE_BYTES in infra/lib/laser-queue-stack.ts; the backend

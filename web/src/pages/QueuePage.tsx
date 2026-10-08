@@ -6,6 +6,7 @@ import {
   getDownloadUrl,
   listJobs,
 } from "../api";
+import { PresenceNotice } from "../components/PresenceNotice";
 import {
   AlertIcon,
   CheckIcon,
@@ -304,6 +305,8 @@ export function QueuePage() {
           Refresh
         </button>
       </header>
+
+      <PresenceNotice />
 
       {error && (
         <p className="notice error" role="alert">
