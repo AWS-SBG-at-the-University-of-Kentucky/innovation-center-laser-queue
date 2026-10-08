@@ -47,10 +47,29 @@ export function createJob(input: CreateJobRequest) {
   });
 }
 
-/** Uploads straight to S3 using the presigned URL from createJob. */
-export async function uploadFile(uploadUrl: string, file: File) {
-  const res = await fetch(uploadUrl, { method: "PUT", body: file });
-  if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+/**
+ * Uploads straight to S3 using the presigned URL from createJob. Uses XHR
+ * rather than fetch because fetch can't report upload progress.
+ */
+export function uploadFile(
+  uploadUrl: string,
+  file: File,
+  onProgress?: (fraction: number) => void,
+) {
+  return new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", uploadUrl);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress?.(event.loaded / event.total);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`Upload failed (${xhr.status})`));
+    };
+    xhr.onerror = () =>
+      reject(new Error("Upload failed. Check your connection and try again."));
+    xhr.send(file);
+  });
 }
 
 export function listJobs() {
