@@ -1,1 +1,92 @@
-# innovation-center-laser-queue
+# Innovation Center Laser Queue
+
+A small web app for submitting files to be laser cut at the Innovation Center.
+Students upload an `.ai`, `.pdf`, or `.svg` file; staff download submissions
+from the queue page on the lab PC.
+
+## Repository layout
+
+```
+web/        React + TypeScript + Vite frontend (/submit, /queue)
+backend/    Lambda handlers (one file per API route)
+infra/      AWS CDK stack: S3, DynamoDB, Lambda, HTTP API
+```
+
+The three folders are npm workspaces, so a single `npm install` at the root
+installs everything.
+
+## API
+
+| Route                        | Handler                                  |
+| ---------------------------- | ---------------------------------------- |
+| `POST /jobs`                 | `backend/src/handlers/createJob.ts`      |
+| `GET /jobs`                  | `backend/src/handlers/listJobs.ts`       |
+| `GET /jobs/{jobId}/download` | `backend/src/handlers/getDownloadUrl.ts` |
+
+Files never pass through Lambda: the browser uploads to and downloads from S3
+directly using short-lived presigned URLs.
+
+## Setup
+
+Prerequisites: Git, Node.js 24 (see `.nvmrc`), and AWS CLI v2. The CDK CLI is
+installed as a dev dependency, so no global install is needed.
+
+```sh
+git clone https://github.com/AWS-SBG-at-the-University-of-Kentucky/innovation-center-laser-queue
+cd innovation-center-laser-queue
+npm install
+```
+
+### Run the frontend
+
+```sh
+cp web/.env.example web/.env.local   # then set VITE_API_URL
+npm run dev
+```
+
+Local frontends point at the shared development backend rather than emulating
+AWS locally.
+
+### Deploy the backend
+
+Deploying needs access to the project's development AWS account through IAM
+Identity Center:
+
+```sh
+aws configure sso --profile ic-laser-dev
+aws sts get-caller-identity --profile ic-laser-dev
+```
+
+```sh
+npm run synth -- --profile ic-laser-dev
+npm run deploy -- --profile ic-laser-dev
+```
+
+The deploy prints an `ApiUrl` output; that is the value for `VITE_API_URL`.
+
+The account must be bootstrapped once (usually by the project lead):
+
+```sh
+cd infra && npx cdk bootstrap --profile ic-laser-dev
+```
+
+### Other commands
+
+```sh
+npm run typecheck   # type-check all three workspaces
+npm run build       # production build of the frontend
+```
+
+## Frontend hosting
+
+`amplify.yml` configures AWS Amplify Hosting to build the `web/` workspace.
+When connecting the repository in the Amplify console, mark it as a monorepo
+with app root `web`, set `VITE_API_URL` as an environment variable, and add a
+rewrite so client-side routes load `index.html`.
+
+## Security
+
+- The S3 bucket is private; access is through presigned URLs only.
+- Never commit AWS credentials or `.env` files.
+- The POC has no authentication. Treat it as an internal test environment and
+  do not expose the queue publicly once it holds real student data.

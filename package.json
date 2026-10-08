@@ -1,0 +1,20 @@
+{
+  "name": "innovation-center-laser-queue",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "web",
+    "backend",
+    "infra"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "npm run dev -w web",
+    "build": "npm run build -w web",
+    "typecheck": "npm run typecheck --workspaces",
+    "synth": "npm run synth -w infra --",
+    "deploy": "npm run deploy -w infra --"
+  }
+}

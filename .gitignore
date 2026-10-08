@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Environment / credentials — never commit these
+.env
+.env.*
+!.env.example
+
+# CDK
+cdk.out/
+cdk.context.json
+
+.DS_Store
+*.log
