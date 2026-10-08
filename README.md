@@ -61,8 +61,23 @@ aws sts get-caller-identity --profile innovation-center
 
 ```sh
 npm run synth -- --profile innovation-center
-npm run deploy -- --profile innovation-center
+npm run deploy:dev
+npm run deploy:prod
 ```
+
+These commands deploy the current checkout to `LaserQueue-dev` or
+`LaserQueue-prod` in `us-east-2`, using the `innovation-center` AWS profile.
+Production deployment requires the current branch to be `main`. To explicitly
+override the warning on another branch (including detached HEAD):
+
+```sh
+npm run deploy:prod -- --allow-non-main
+```
+
+If your AWS session has expired, sign in with
+`aws login --profile innovation-center` before deploying. The lower-level
+`npm run deploy -- ...` command remains available and does not apply this
+branch guard.
 
 The deploy prints an `ApiUrl` output; that is the value for `VITE_API_URL`.
 
