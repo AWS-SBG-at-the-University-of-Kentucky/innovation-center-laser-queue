@@ -14,6 +14,7 @@ export interface Job {
   fileExtension: FileExtension;
   status: "QUEUED" | "COMPLETED";
   createdAt: string;
+  completedAt?: string;
 }
 
 export interface CreateJobRequest {
@@ -74,6 +75,15 @@ export function uploadFile(
 
 export function listJobs() {
   return request<{ jobs: Job[] }>("/jobs");
+}
+
+export function completeJob(jobId: string) {
+  return request<{ job: Job }>(`/jobs/${jobId}/complete`, { method: "POST" });
+}
+
+/** Removes the job and its file. The backend only allows this once completed. */
+export function deleteJob(jobId: string) {
+  return request<null>(`/jobs/${jobId}`, { method: "DELETE" });
 }
 
 export function getDownloadUrl(jobId: string) {

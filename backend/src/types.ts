@@ -15,6 +15,8 @@ export interface Job {
   status: JobStatus;
   /** UTC ISO-8601 timestamp. */
   createdAt: string;
+  /** UTC ISO-8601 timestamp; set when staff mark the job completed. */
+  completedAt?: string;
 }
 
 /** What the API returns for a job; the S3 key stays server-side. */

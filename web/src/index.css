@@ -271,6 +271,30 @@ small {
   background: var(--surface-tint);
 }
 
+.button.icon-only {
+  padding: 0.4375rem;
+}
+
+.button.complete:hover:not(:disabled) {
+  background: var(--success-soft);
+  color: var(--success);
+  border-color: currentColor;
+}
+
+.button.remove:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: currentColor;
+}
+
+.button.danger {
+  background: #c62828;
+}
+
+.button.danger:hover:not(:disabled) {
+  background: #a91f1f;
+}
+
 .icon-button {
   display: grid;
   place-items: center;
@@ -515,7 +539,63 @@ main.wide > .notice {
 }
 
 .col-action {
-  width: 9.5rem;
+  width: 11.5rem;
+}
+
+.row-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 2.5rem 0 0.75rem;
+}
+
+.section-header span {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* Confirmation dialog */
+
+.modal {
+  width: calc(100% - 2rem);
+  max-width: 26rem;
+  padding: 0;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 25%);
+  animation: pop-in 0.15s ease-out;
+}
+
+.modal::backdrop {
+  background: rgb(10 18 34 / 50%);
+}
+
+.modal-body {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.5rem;
+}
+
+.modal-body p {
+  color: var(--muted);
+}
+
+.modal-body p strong {
+  color: var(--text);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 
 .queue-table th,

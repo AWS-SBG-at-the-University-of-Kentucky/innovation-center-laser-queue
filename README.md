@@ -22,6 +22,8 @@ installs everything.
 | `POST /jobs`                 | `backend/src/handlers/createJob.ts`      |
 | `GET /jobs`                  | `backend/src/handlers/listJobs.ts`       |
 | `GET /jobs/{jobId}/download` | `backend/src/handlers/getDownloadUrl.ts` |
+| `POST /jobs/{jobId}/complete`| `backend/src/handlers/completeJob.ts`    |
+| `DELETE /jobs/{jobId}`       | `backend/src/handlers/deleteJob.ts`      |
 
 Files never pass through Lambda: the browser uploads to and downloads from S3
 directly using short-lived presigned URLs.
@@ -53,13 +55,13 @@ Deploying needs access to the project's development AWS account through IAM
 Identity Center:
 
 ```sh
-aws configure sso --profile ic-laser-dev
-aws sts get-caller-identity --profile ic-laser-dev
+aws configure sso --profile innovation-center
+aws sts get-caller-identity --profile innovation-center
 ```
 
 ```sh
-npm run synth -- --profile ic-laser-dev
-npm run deploy -- --profile ic-laser-dev
+npm run synth -- --profile innovation-center
+npm run deploy -- --profile innovation-center
 ```
 
 The deploy prints an `ApiUrl` output; that is the value for `VITE_API_URL`.
@@ -67,7 +69,7 @@ The deploy prints an `ApiUrl` output; that is the value for `VITE_API_URL`.
 The account must be bootstrapped once (usually by the project lead):
 
 ```sh
-cd infra && npx cdk bootstrap --profile ic-laser-dev
+cd infra && npx cdk bootstrap --profile innovation-center
 ```
 
 ### Other commands

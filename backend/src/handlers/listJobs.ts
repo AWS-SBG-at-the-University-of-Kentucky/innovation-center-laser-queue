@@ -13,9 +13,6 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
     const page = await ddb.send(
       new ScanCommand({
         TableName: config.tableName,
-        FilterExpression: "#status = :queued",
-        ExpressionAttributeNames: { "#status": "status" },
-        ExpressionAttributeValues: { ":queued": "QUEUED" },
         ExclusiveStartKey: startKey,
       }),
     );
