@@ -157,7 +157,7 @@ export function SubmitPage() {
               <input
                 name="studentEmail"
                 type="email"
-                placeholder="yourname@university.edu"
+                placeholder="linkblue@uky.edu"
                 autoComplete="email"
                 readOnly={submitting}
                 required
