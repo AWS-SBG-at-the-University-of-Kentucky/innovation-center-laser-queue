@@ -8,13 +8,12 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   check:
     runs-on: ubuntu-latest
+    concurrency:
+      group: ci-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v5
 
@@ -33,4 +32,34 @@ jobs:
 
       # Needs no AWS credentials; catches CDK and Lambda bundling errors.
       - name: Synthesize the CDK stack
-        run: npm run synth -- --quiet
+        run: npm run synth -- -c stage=prod --quiet
+
+  deploy-production:
+    name: Deploy production backend
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-2
+          allowed-account-ids: '579730595819'
+      - name: Deploy the production backend
+        run: npm run deploy -- LaserQueue-prod -c stage=prod --require-approval never --outputs-file "$RUNNER_TEMP/prod-outputs.json"
+      - name: Check the deployed API
+        run: |
+          API_URL=$(node -p 'require(process.env.RUNNER_TEMP + "/prod-outputs.json")["LaserQueue-prod"].ApiUrl')
+          curl --fail --silent --show-error --retry 3 "$API_URL/jobs"

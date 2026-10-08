@@ -40,6 +40,14 @@ export class LaserQueueStack extends cdk.Stack {
     const table = new dynamodb.Table(this, "LaserJobs", {
       partitionKey: { name: "jobId", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      ...(this.node.tryGetContext("stage") === "prod"
+        ? {
+            deletionProtection: true,
+            pointInTimeRecoverySpecification: {
+              pointInTimeRecoveryEnabled: true,
+            },
+          }
+        : {}),
     });
 
     const handler = (id: string, file: string) =>

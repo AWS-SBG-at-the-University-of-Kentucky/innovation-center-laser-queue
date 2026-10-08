@@ -86,9 +86,13 @@ When connecting the repository in the Amplify console, mark it as a monorepo
 with app root `web`, set `VITE_API_URL` as an environment variable, and add a
 rewrite so client-side routes load `index.html`.
 
+See [production deployment](docs/production.md) for the production URLs,
+administrator OIDC setup, and automatic deployment configuration.
+
 ## Security
 
 - The S3 bucket is private; access is through presigned URLs only.
 - Never commit AWS credentials or `.env` files.
-- The POC has no authentication. Treat it as an internal test environment and
-  do not expose the queue publicly once it holds real student data.
+- The app currently has no authentication in either environment. Anyone with
+  its URL can view and manage submissions; production retains this access
+  model for now.
