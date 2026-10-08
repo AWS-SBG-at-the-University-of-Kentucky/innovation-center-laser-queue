@@ -16,6 +16,9 @@
     "typecheck": "npm run typecheck --workspaces",
     "synth": "npm run synth -w infra --",
     "deploy": "npm run deploy -w infra --",
+    "deploy:dev": "node scripts/deploy.mjs dev",
+    "deploy:prod": "node scripts/deploy.mjs prod",
+    "test:deploy": "node --test scripts/deploy.test.mjs",
     "reset:dev": "npm run reset:dev -w backend --"
   }
 }

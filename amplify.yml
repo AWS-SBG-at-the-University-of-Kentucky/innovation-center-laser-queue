@@ -2,15 +2,18 @@ version: 1
 applications:
   - appRoot: web
     frontend:
+      buildPath: /
       phases:
         preBuild:
           commands:
+            - nvm install 24
+            - nvm use 24
             - npm ci
         build:
           commands:
             - npm run build
       artifacts:
-        baseDirectory: dist
+        baseDirectory: web/dist
         files:
           - "**/*"
       cache:

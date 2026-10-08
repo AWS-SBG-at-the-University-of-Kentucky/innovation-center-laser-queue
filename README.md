@@ -61,8 +61,23 @@ aws sts get-caller-identity --profile innovation-center
 
 ```sh
 npm run synth -- --profile innovation-center
-npm run deploy -- --profile innovation-center
+npm run deploy:dev
+npm run deploy:prod
 ```
+
+These commands deploy the current checkout to `LaserQueue-dev` or
+`LaserQueue-prod` in `us-east-2`, using the `innovation-center` AWS profile.
+Production deployment requires the current branch to be `main`. To explicitly
+override the warning on another branch (including detached HEAD):
+
+```sh
+npm run deploy:prod -- --allow-non-main
+```
+
+If your AWS session has expired, sign in with
+`aws login --profile innovation-center` before deploying. The lower-level
+`npm run deploy -- ...` command remains available and does not apply this
+branch guard.
 
 The deploy prints an `ApiUrl` output; that is the value for `VITE_API_URL`.
 
@@ -86,9 +101,13 @@ When connecting the repository in the Amplify console, mark it as a monorepo
 with app root `web`, set `VITE_API_URL` as an environment variable, and add a
 rewrite so client-side routes load `index.html`.
 
+See [production deployment](docs/production.md) for the production URLs,
+administrator OIDC setup, and automatic deployment configuration.
+
 ## Security
 
 - The S3 bucket is private; access is through presigned URLs only.
 - Never commit AWS credentials or `.env` files.
-- The POC has no authentication. Treat it as an internal test environment and
-  do not expose the queue publicly once it holds real student data.
+- The app currently has no authentication in either environment. Anyone with
+  its URL can view and manage submissions; production retains this access
+  model for now.
