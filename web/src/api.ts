@@ -2,6 +2,10 @@
 export const ALLOWED_EXTENSIONS = ["ai", "pdf", "svg"] as const;
 export type FileExtension = (typeof ALLOWED_EXTENSIONS)[number];
 
+// Mirrors MAX_FILE_SIZE_BYTES in infra/lib/laser-queue-stack.ts; the backend
+// is what enforces it.
+export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+
 export interface Job {
   jobId: string;
   studentName: string;
@@ -16,6 +20,7 @@ export interface CreateJobRequest {
   studentName: string;
   studentEmail: string;
   fileName: string;
+  fileSize: number;
 }
 
 export interface CreateJobResponse {

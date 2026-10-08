@@ -1,6 +1,7 @@
 :root {
   font-family: system-ui, sans-serif;
   line-height: 1.5;
+  color-scheme: light dark;
 }
 
 body {
@@ -13,6 +14,10 @@ main {
   padding: 2rem 1rem;
 }
 
+main.wide {
+  max-width: 60rem;
+}
+
 form {
   display: grid;
   gap: 1rem;
@@ -21,4 +26,64 @@ form {
 label {
   display: grid;
   gap: 0.25rem;
+}
+
+input,
+button {
+  font: inherit;
+}
+
+input:not([type="file"]) {
+  padding: 0.5rem;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  justify-self: start;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.notice {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-left: 4px solid;
+  border-radius: 4px;
+}
+
+.notice.error {
+  border-color: #c62828;
+  background: color-mix(in srgb, #c62828 12%, transparent);
+}
+
+.notice.success {
+  border-color: #2e7d32;
+  background: color-mix(in srgb, #2e7d32 12%, transparent);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+}
+
+td small {
+  opacity: 0.7;
 }

@@ -16,3 +16,6 @@ export interface Job {
   /** UTC ISO-8601 timestamp. */
   createdAt: string;
 }
+
+/** What the API returns for a job; the S3 key stays server-side. */
+export type JobSummary = Omit<Job, "s3Key">;
