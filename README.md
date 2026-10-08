@@ -1,7 +1,7 @@
 # Innovation Center Laser Queue
 
 A small web app for submitting files to be laser cut at the Innovation Center.
-Students upload an `.ai`, `.pdf`, or `.svg` file; staff download submissions
+Students upload an Adobe Illustrator (`.ai`) file; staff download submissions
 from the queue page on the lab PC.
 
 ## Repository layout
