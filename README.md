@@ -101,9 +101,6 @@ When connecting the repository in the Amplify console, mark it as a monorepo
 with app root `web`, set `VITE_API_URL` as an environment variable, and add a
 rewrite so client-side routes load `index.html`.
 
-See [production deployment](docs/production.md) for the production URLs,
-administrator OIDC setup, and automatic deployment configuration.
-
 ## Security
 
 - The S3 bucket is private; access is through presigned URLs only.
