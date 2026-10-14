@@ -4,6 +4,10 @@ A small web app for submitting files to be laser cut at the Innovation Center.
 Students upload an Adobe Illustrator (`.ai`) file; staff download submissions
 from the queue page on the lab PC.
 
+New to the project? Read this file for setup, then
+[docs/architecture.md](docs/architecture.md) for how it works and
+[CONTRIBUTING.md](CONTRIBUTING.md) for how to make changes.
+
 ## Repository layout
 
 ```
