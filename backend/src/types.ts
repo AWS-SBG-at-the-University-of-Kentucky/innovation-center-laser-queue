@@ -6,6 +6,8 @@ export type JobStatus = "QUEUED" | "COMPLETED";
 /** One item in the LaserJobs table. */
 export interface Job {
   jobId: string;
+  /** Entra object ID of the submitter. Missing on jobs from before sign-in. */
+  studentId?: string;
   studentName: string;
   studentEmail: string;
   originalFileName: string;

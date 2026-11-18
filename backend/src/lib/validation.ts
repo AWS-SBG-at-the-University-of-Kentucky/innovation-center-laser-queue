@@ -1,13 +1,10 @@
 import { ALLOWED_EXTENSIONS, type FileExtension } from "../types.js";
 
-const MAX_NAME_LENGTH = 100;
-const MAX_EMAIL_LENGTH = 254;
 const MAX_FILE_NAME_LENGTH = 200;
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// The student's name and email come from their sign-in token, not the request
+// body, so they aren't validated here.
 export interface CreateJobInput {
-  studentName: string;
-  studentEmail: string;
   fileName: string;
   fileExtension: FileExtension;
   fileSize: number;
@@ -39,25 +36,7 @@ export function validateCreateJob(
   if (typeof body !== "object" || body === null) {
     return invalid("Request body must be a JSON object.");
   }
-  const { studentName, studentEmail, fileName, fileSize } = body as Record<
-    string,
-    unknown
-  >;
-
-  if (typeof studentName !== "string" || !studentName.trim()) {
-    return invalid("Name is required.");
-  }
-  if (studentName.trim().length > MAX_NAME_LENGTH) {
-    return invalid(`Name must be ${MAX_NAME_LENGTH} characters or fewer.`);
-  }
-
-  if (
-    typeof studentEmail !== "string" ||
-    studentEmail.length > MAX_EMAIL_LENGTH ||
-    !EMAIL_PATTERN.test(studentEmail.trim())
-  ) {
-    return invalid("A valid student email is required.");
-  }
+  const { fileName, fileSize } = body as Record<string, unknown>;
 
   if (typeof fileName !== "string" || !fileName.trim()) {
     return invalid("A file is required.");
@@ -88,8 +67,6 @@ export function validateCreateJob(
   return {
     ok: true,
     value: {
-      studentName: studentName.trim(),
-      studentEmail: studentEmail.trim().toLowerCase(),
       fileName: safeFileName,
       fileExtension,
       fileSize,

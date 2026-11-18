@@ -59,7 +59,12 @@ jobs:
           allowed-account-ids: '579730595819'
       - name: Deploy the production backend
         run: npm run deploy -- LaserQueue-prod -c stage=prod --require-approval never --outputs-file "$RUNNER_TEMP/prod-outputs.json"
+      # Every route needs an Entra sign-in token, so an anonymous request
+      # should be rejected with 401. Anything else means the API is down or
+      # has lost its authorizer.
       - name: Check the deployed API
         run: |
           API_URL=$(node -p 'require(process.env.RUNNER_TEMP + "/prod-outputs.json")["LaserQueue-prod"].ApiUrl')
-          curl --fail --silent --show-error --retry 3 "$API_URL/jobs"
+          STATUS=$(curl --silent --output /dev/null --write-out '%{http_code}' --retry 3 "$API_URL/jobs")
+          echo "GET /jobs without a token returned $STATUS"
+          test "$STATUS" = "401"

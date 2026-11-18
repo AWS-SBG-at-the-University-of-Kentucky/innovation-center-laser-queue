@@ -5,6 +5,7 @@ import {
   createJob,
   uploadFile,
 } from "../api";
+import { accountEmail, useAccount } from "../components/AuthGate";
 import { PresenceNotice } from "../components/PresenceNotice";
 import {
   AlertIcon,
@@ -45,6 +46,7 @@ function formatBytes(bytes: number) {
 }
 
 export function SubmitPage() {
+  const account = useAccount();
   const [status, setStatus] = useState<Status>({ state: "idle" });
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -91,13 +93,9 @@ export function SubmitPage() {
       setStatus({ state: "error", message: "Choose a file to upload." });
       return;
     }
-    const data = new FormData(event.currentTarget);
-
     setStatus({ state: "submitting", progress: null });
     try {
       const { uploadUrl } = await createJob({
-        studentName: String(data.get("studentName")),
-        studentEmail: String(data.get("studentEmail")),
         fileName: file.name,
         fileSize: file.size,
       });
@@ -144,28 +142,16 @@ export function SubmitPage() {
         <section className="card">
           <h2 className="card-header">Submit a New Job</h2>
           <form className="card-body" onSubmit={handleSubmit}>
-            <label className="field">
-              <span className="field-label">Name</span>
-              <input
-                name="studentName"
-                placeholder="Enter your full name"
-                autoComplete="name"
-                maxLength={100}
-                readOnly={submitting}
-                required
-              />
-            </label>
-            <label className="field">
-              <span className="field-label">Student Email</span>
-              <input
-                name="studentEmail"
-                type="email"
-                placeholder="linkblue@uky.edu"
-                autoComplete="email"
-                readOnly={submitting}
-                required
-              />
-            </label>
+            {/* The API takes these from the sign-in token, not the form. */}
+            <div className="field">
+              <span className="field-label">Submitting as</span>
+              <div className="submitter">
+                <strong className="truncate">
+                  {account.name ?? accountEmail(account)}
+                </strong>
+                <small className="truncate">{accountEmail(account)}</small>
+              </div>
+            </div>
 
             <div className="field">
               <span className="field-label">File Upload</span>

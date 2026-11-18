@@ -1,3 +1,5 @@
+import { getAccessToken } from "./auth";
+
 // Mirrors backend/src/types.ts — keep the two in sync.
 export const ALLOWED_EXTENSIONS = ["ai"] as const;
 export type FileExtension = (typeof ALLOWED_EXTENSIONS)[number];
@@ -8,6 +10,8 @@ export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
 export interface Job {
   jobId: string;
+  /** Entra object ID of the submitter. Missing on jobs from before sign-in. */
+  studentId?: string;
   studentName: string;
   studentEmail: string;
   originalFileName: string;
@@ -17,9 +21,8 @@ export interface Job {
   completedAt?: string;
 }
 
+// The student's name and email come from their sign-in token.
 export interface CreateJobRequest {
-  studentName: string;
-  studentEmail: string;
   fileName: string;
   fileSize: number;
 }
@@ -31,8 +34,10 @@ export interface CreateJobResponse {
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, init);
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  headers.set("authorization", `Bearer ${await getAccessToken()}`);
+  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
   const body = await res.json().catch(() => null);
   if (!res.ok) {
     throw new Error(body?.message ?? `Request failed (${res.status})`);

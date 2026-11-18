@@ -749,3 +749,59 @@ main.wide > .notice {
     flex-direction: column;
   }
 }
+
+/* Sign-in */
+
+.auth-loading {
+  display: grid;
+  place-items: center;
+  min-height: 50vh;
+  color: var(--muted);
+}
+
+.user-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: 1rem 1rem 0;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.user-bar strong {
+  color: var(--text);
+}
+
+.badge.staff {
+  flex: none;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+.checkbox input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.submitter {
+  min-width: 0;
+  padding: 0.625rem 0.75rem;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+
+a.button {
+  text-decoration: none;
+}
