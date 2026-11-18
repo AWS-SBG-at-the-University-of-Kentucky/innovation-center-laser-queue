@@ -25,7 +25,8 @@ flowchart LR
 There are two pages:
 
 - **`/submit`** (`web/src/pages/SubmitPage.tsx`): signed-in students upload an
-  `.ai` file. Their name and email come from their UK account.
+  `.ai` file. Their name comes from their UK account. The page shows how
+  many jobs are in line and, after submitting, the student's place in line.
 - **`/queue`** (`web/src/pages/QueuePage.tsx`): staff on the lab PC see every
   job, download files, mark jobs completed, and delete completed jobs.
 
@@ -46,8 +47,8 @@ sequenceDiagram
   participant T as Staff (/queue)
 
   S->>API: POST /jobs {fileName, fileSize} + token
-  API->>DB: put job (status QUEUED)
-  API-->>S: {jobId, uploadUrl}
+  API->>DB: put job (status QUEUED), count queue
+  API-->>S: {jobId, uploadUrl, position}
   S->>B: PUT file to uploadUrl
   T->>API: GET /jobs
   API-->>T: all jobs, oldest first
@@ -110,9 +111,12 @@ not by this app. `request()` in `web/src/api.ts` attaches a fresh access
 token to every call. The queue page hides itself from non-staff, but that's
 only for a friendlier message: the API enforces the role either way.
 
-`createJob` takes the student's name and email (their linkblue
-`preferred_username`) and Entra object ID from the token, not from the request
-body, so nobody can submit a job under someone else's name.
+`createJob` takes the student's name from the token, not from the request
+body, so nobody can submit a job under someone else's name. The name is the
+only personal detail stored with a job. `authorize()` still reads the linkblue
+`preferred_username` and Entra object ID to check the caller, but they are not
+saved. The frontend shows the student their own email from MSAL so they know
+which account they're on.
 
 Entra settings this depends on (app registration unless noted):
 
@@ -160,7 +164,8 @@ checks for the file first and returns a clear 404 when it's missing.
 record is still there and staff can retry. Doing it the other way round could
 leave files in S3 that nothing points to.
 
-**`GET /jobs` scans the whole table.** That's fine at lab scale (hundreds of
+**`GET /jobs` scans the whole table**, and so do `GET /queue/length` and
+`createJob` (to count the queue). That's fine at lab scale (hundreds of
 jobs). If the table ever grows large, add a secondary index on `status` or
 `createdAt` and query that instead.
 

@@ -20,7 +20,7 @@ import {
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 const timeFormat = new Intl.DateTimeFormat(undefined, { timeStyle: "short" });
 
-const COLUMNS = ["Submitted", "Student", "Email", "File", "Status", "Action"];
+const COLUMNS = ["Submitted", "Student", "File", "Status", "Action"];
 
 function message(err: unknown) {
   return err instanceof Error ? err.message : "Something went wrong.";
@@ -29,39 +29,67 @@ function message(err: unknown) {
 function JobTable({
   jobs,
   loading,
+  numbered = false,
   renderActions,
 }: {
   /** null renders placeholder rows for the first load. */
   jobs: Job[] | null;
   loading: boolean;
+  /** Adds a first column with each job's place in line, starting at 1. */
+  numbered?: boolean;
   renderActions: (job: Job) => ReactNode;
 }) {
+  const columns = numbered ? ["Position", ...COLUMNS] : COLUMNS;
   return (
     <div className="card table-scroll">
-      <table className="queue-table" aria-busy={loading}>
+      <table
+        className={numbered ? "queue-table numbered" : "queue-table"}
+        aria-busy={loading}
+      >
         <colgroup>
+          {numbered && <col className="col-position" />}
           <col className="col-submitted" />
           <col className="col-student" />
-          <col className="col-email" />
           <col />
           <col className="col-status" />
           <col className="col-action" />
         </colgroup>
         <thead>
           <tr>
-            {COLUMNS.map((column) => (
-              <th key={column} scope="col">
-                {column}
-              </th>
-            ))}
+            {columns.map((column) =>
+              column === "Position" ? (
+                <th key={column} scope="col">
+                  <span aria-hidden="true">#</span>
+                  <span className="visually-hidden">Position</span>
+                </th>
+              ) : (
+                <th key={column} scope="col">
+                  {column}
+                </th>
+              ),
+            )}
           </tr>
         </thead>
         <tbody>
           {jobs
-            ? jobs.map((job) => {
+            ? jobs.map((job, index) => {
                 const created = new Date(job.createdAt);
                 return (
                   <tr key={job.jobId}>
+                    {numbered && (
+                      <td>
+                        <span
+                          className={
+                            index === 0 ? "position next" : "position"
+                          }
+                          title={
+                            index === 0 ? "Next in line" : `#${index + 1} in line`
+                          }
+                        >
+                          {index + 1}
+                        </span>
+                      </td>
+                    )}
                     <td>
                       {dateFormat.format(created)}
                       <small>{timeFormat.format(created)}</small>
@@ -69,11 +97,6 @@ function JobTable({
                     <td>
                       <span className="truncate" title={job.studentName}>
                         {job.studentName}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="truncate" title={job.studentEmail}>
-                        {job.studentEmail}
                       </span>
                     </td>
                     <td>
@@ -95,7 +118,7 @@ function JobTable({
               })
             : [0, 1, 2].map((row) => (
                 <tr key={row}>
-                  {COLUMNS.map((column) => (
+                  {columns.map((column) => (
                     <td key={column}>
                       <span className="skeleton" />
                     </td>
@@ -327,6 +350,7 @@ export function QueuePage() {
         <JobTable
           jobs={queued}
           loading={loading}
+          numbered
           renderActions={(job) => (
             <>
               {downloadButton(job)}

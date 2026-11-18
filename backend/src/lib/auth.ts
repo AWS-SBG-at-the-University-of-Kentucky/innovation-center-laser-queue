@@ -20,7 +20,9 @@ type Claims =
 export interface User {
   /** Entra object ID; stable even if the user's name or email changes. */
   id: string;
+  /** Display name. The only part of the user that gets stored with a job. */
   name: string;
+  /** Linkblue sign-in (abc123@uky.edu). Checked, never stored. */
   email: string;
   isStaff: boolean;
 }
@@ -101,8 +103,10 @@ export function authorize(
     return deny(403, "Only Innovation Center staff can do this.", "not staff");
   }
 
-  return {
-    ok: true,
-    user: { id, email, isStaff, name: stringClaim(claims, "name") ?? email },
-  };
+  // The name is stored with the job, so its fallback is the linkblue ID
+  // (abc123), never the full email address.
+  const name =
+    stringClaim(claims, "name") ?? (email.split("@")[0] || "UK student");
+
+  return { ok: true, user: { id, email, isStaff, name } };
 }

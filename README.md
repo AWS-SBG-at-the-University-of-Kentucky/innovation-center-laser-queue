@@ -24,6 +24,7 @@ installs everything.
 | Route                        | Who can call it | Handler                                  |
 | ---------------------------- | --------------- | ---------------------------------------- |
 | `POST /jobs`                 | Any UK member   | `backend/src/handlers/createJob.ts`      |
+| `GET /queue/length`          | Any UK member   | `backend/src/handlers/getQueueLength.ts` |
 | `GET /jobs`                  | Staff           | `backend/src/handlers/listJobs.ts`       |
 | `GET /jobs/{jobId}/download` | Staff           | `backend/src/handlers/getDownloadUrl.ts` |
 | `POST /jobs/{jobId}/complete`| Staff           | `backend/src/handlers/completeJob.ts`    |
@@ -135,4 +136,9 @@ rewrite so client-side routes load `index.html`.
 - Every API route requires a UK Entra ID sign-in. Guest accounts are
   rejected, and only users with the `Staff` app role can view, download,
   complete or delete jobs.
-- The student's name and email are taken from their sign-in, not typed in.
+- The student's name is taken from their sign-in, not typed in. It is the
+  only personal detail stored: emails and Entra IDs are not saved. Jobs from
+  before that change can be cleaned up with
+  `npm run strip-student-ids -- --stage <dev|prod> --profile <aws-profile>`.
+- Students can see how many jobs are waiting (`GET /queue/length`) and their
+  own place in line, but never other students' names or files.

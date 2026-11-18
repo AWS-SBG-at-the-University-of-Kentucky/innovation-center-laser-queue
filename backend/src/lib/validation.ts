@@ -2,8 +2,8 @@ import { ALLOWED_EXTENSIONS, type FileExtension } from "../types.js";
 
 const MAX_FILE_NAME_LENGTH = 200;
 
-// The student's name and email come from their sign-in token, not the request
-// body, so they aren't validated here.
+// The student's name comes from their sign-in token, not the request body, so
+// it isn't validated here.
 export interface CreateJobInput {
   fileName: string;
   fileExtension: FileExtension;

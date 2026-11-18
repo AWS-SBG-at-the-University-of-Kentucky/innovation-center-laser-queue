@@ -10,10 +10,7 @@ export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
 export interface Job {
   jobId: string;
-  /** Entra object ID of the submitter. Missing on jobs from before sign-in. */
-  studentId?: string;
   studentName: string;
-  studentEmail: string;
   originalFileName: string;
   fileExtension: FileExtension;
   status: "QUEUED" | "COMPLETED";
@@ -21,7 +18,7 @@ export interface Job {
   completedAt?: string;
 }
 
-// The student's name and email come from their sign-in token.
+// The student's name comes from their sign-in token.
 export interface CreateJobRequest {
   fileName: string;
   fileSize: number;
@@ -30,6 +27,8 @@ export interface CreateJobRequest {
 export interface CreateJobResponse {
   jobId: string;
   uploadUrl: string;
+  /** The new job's place in line, counting from 1. */
+  position: number;
 }
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -76,6 +75,11 @@ export function uploadFile(
       reject(new Error("Upload failed. Check your connection and try again."));
     xhr.send(file);
   });
+}
+
+/** How many jobs are waiting. Any signed-in student can ask for this. */
+export function getQueueLength() {
+  return request<{ queued: number }>("/queue/length");
 }
 
 export function listJobs() {

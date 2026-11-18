@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "reset:dev": "tsx scripts/reset-dev.ts"
+    "reset:dev": "tsx scripts/reset-dev.ts",
+    "strip-student-ids": "tsx scripts/strip-student-ids.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1147.0",

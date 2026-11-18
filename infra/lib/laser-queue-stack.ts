@@ -75,11 +75,15 @@ export class LaserQueueStack extends cdk.Stack {
       });
 
     const createJob = handler("CreateJob", "createJob.ts");
-    table.grantWriteData(createJob);
+    // Read as well as write: it counts the queue to tell the student their place.
+    table.grantReadWriteData(createJob);
     bucket.grantPut(createJob);
 
     const listJobs = handler("ListJobs", "listJobs.ts");
     table.grantReadData(listJobs);
+
+    const getQueueLength = handler("GetQueueLength", "getQueueLength.ts");
+    table.grantReadData(getQueueLength);
 
     const getDownloadUrl = handler("GetDownloadUrl", "getDownloadUrl.ts");
     table.grantReadData(getDownloadUrl);
@@ -123,6 +127,14 @@ export class LaserQueueStack extends cdk.Stack {
       path: "/jobs",
       methods: [apigwv2.HttpMethod.GET],
       integration: new HttpLambdaIntegration("ListJobsIntegration", listJobs),
+    });
+    api.addRoutes({
+      path: "/queue/length",
+      methods: [apigwv2.HttpMethod.GET],
+      integration: new HttpLambdaIntegration(
+        "GetQueueLengthIntegration",
+        getQueueLength,
+      ),
     });
     api.addRoutes({
       path: "/jobs/{jobId}/download",

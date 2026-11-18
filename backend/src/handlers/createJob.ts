@@ -7,6 +7,7 @@ import { authorize } from "../lib/auth.js";
 import { ddb, s3 } from "../lib/aws.js";
 import { config } from "../lib/config.js";
 import { error, json } from "../lib/http.js";
+import { countQueued } from "../lib/jobs.js";
 import { validateCreateJob } from "../lib/validation.js";
 import type { Job } from "../types.js";
 
@@ -29,9 +30,7 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) 
   const jobId = randomUUID();
   const job: Job = {
     jobId,
-    studentId: auth.user.id,
     studentName: auth.user.name,
-    studentEmail: auth.user.email,
     originalFileName: input.fileName,
     s3Key: `jobs/${jobId}/${input.fileName}`,
     fileExtension: input.fileExtension,
@@ -56,5 +55,9 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) 
 
   await ddb.send(new PutCommand({ TableName: config.tableName, Item: job }));
 
-  return json(201, { jobId, uploadUrl });
+  // Counted after the put, so this job is included and two students
+  // submitting at the same moment don't both get the same place.
+  const position = await countQueued(job.createdAt);
+
+  return json(201, { jobId, uploadUrl, position });
 };

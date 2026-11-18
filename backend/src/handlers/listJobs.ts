@@ -4,6 +4,7 @@ import { authorize } from "../lib/auth.js";
 import { ddb } from "../lib/aws.js";
 import { config } from "../lib/config.js";
 import { json } from "../lib/http.js";
+import { toSummary } from "../lib/jobs.js";
 import type { Job, JobSummary } from "../types.js";
 
 // GET /jobs (staff only)
@@ -26,7 +27,7 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) 
 
   const jobs: JobSummary[] = items
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-    .map(({ s3Key: _s3Key, ...summary }) => summary);
+    .map(toSummary);
 
   return json(200, { jobs });
 };

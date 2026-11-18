@@ -55,6 +55,12 @@
   box-sizing: border-box;
 }
 
+html {
+  /* Stops iOS from enlarging text when the phone is rotated. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -64,7 +70,10 @@ body {
 main {
   max-width: 40rem;
   margin: 0 auto;
-  padding: 3rem 1rem 4rem;
+  /* Insets keep content clear of the notch with viewport-fit=cover. */
+  padding: clamp(1.5rem, 6vw, 3rem) max(1rem, env(safe-area-inset-right))
+    calc(3rem + env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
 }
 
 main.wide {
@@ -78,9 +87,10 @@ p {
 }
 
 h1 {
-  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  font-size: clamp(1.625rem, 5vw, 2.5rem);
   line-height: 1.15;
   letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 
 h2 {
@@ -139,7 +149,31 @@ small {
 }
 
 .hero p {
-  font-size: 1.125rem;
+  font-size: clamp(1rem, 3vw, 1.125rem);
+  text-wrap: pretty;
+}
+
+.queue-length {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  background: var(--primary-soft);
+  color: var(--primary-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  border-radius: 1rem;
+  animation: pop-in 0.2s ease-out;
+}
+
+.queue-length-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  background: var(--success);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--success-soft);
 }
 
 .page-header {
@@ -151,6 +185,14 @@ small {
 }
 
 /* Card */
+
+.card-header.split {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
 
 .card {
   background: var(--surface);
@@ -359,6 +401,21 @@ small {
   transform: translateY(-3px);
 }
 
+/* Phones and tablets can't drag files in, so they get a tap prompt. */
+.touch-only {
+  display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .touch-only {
+    display: inline;
+  }
+
+  .pointer-only {
+    display: none;
+  }
+}
+
 .file-card {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -452,7 +509,8 @@ small {
 }
 
 .hero + .notice,
-.page-header + .notice {
+.page-header + .notice,
+main > .notice:first-child {
   margin-bottom: 1.5rem;
 }
 
@@ -494,6 +552,16 @@ main.wide > .notice {
 
 .success-panel p strong {
   color: var(--text);
+}
+
+.success-panel .queue-position {
+  color: var(--text);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.success-panel .queue-position strong {
+  color: var(--primary-text);
 }
 
 .success-panel .button {
@@ -538,10 +606,18 @@ main.wide > .notice {
 
 .queue-table {
   width: 100%;
-  min-width: 52rem;
+  min-width: 44rem;
   border-collapse: collapse;
   /* Fixed layout so long names truncate rather than widen their column. */
   table-layout: fixed;
+}
+
+.queue-table.numbered {
+  min-width: 47rem;
+}
+
+.col-position {
+  width: 3.75rem;
 }
 
 .col-submitted {
@@ -549,11 +625,7 @@ main.wide > .notice {
 }
 
 .col-student {
-  width: 16%;
-}
-
-.col-email {
-  width: 23%;
+  width: 26%;
 }
 
 .col-status {
@@ -661,6 +733,28 @@ main.wide > .notice {
   color: var(--success);
 }
 
+/* Place in line on the queue table. */
+.position {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding-inline: 0.5rem;
+  background: var(--surface-tint);
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+
+.position.next {
+  background: var(--primary);
+  color: #fff;
+  border-color: transparent;
+}
+
 .skeleton {
   display: block;
   height: 0.875rem;
@@ -740,13 +834,51 @@ main.wide > .notice {
 }
 
 @media (max-width: 30rem) {
-  main {
-    padding-top: 2rem;
+  .hero {
+    margin-bottom: 1.5rem;
   }
 
   .page-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .card-header {
+    padding: 0.875rem 1rem;
+  }
+
+  .card-body {
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .dropzone {
+    padding: 1.5rem 0.75rem;
+  }
+
+  .file-card {
+    gap: 0.625rem;
+    padding: 0.75rem;
+  }
+
+  .success-panel,
+  .empty-state {
+    padding: 2rem 1rem;
+  }
+}
+
+/* Phones held sideways have little height to spare. */
+@media (max-height: 32rem) and (orientation: landscape) {
+  main {
+    padding-top: 1.25rem;
+  }
+
+  .hero {
+    margin-bottom: 1.25rem;
+  }
+
+  .dropzone {
+    padding-block: 1.25rem;
   }
 }
 
@@ -762,17 +894,35 @@ main.wide > .notice {
 .user-bar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 0.75rem;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
   max-width: 68rem;
   margin: 0 auto;
-  padding: 1rem 1rem 0;
+  padding: 1rem max(1rem, env(safe-area-inset-right)) 0
+    max(1rem, env(safe-area-inset-left));
   font-size: 0.875rem;
   color: var(--muted);
 }
 
 .user-bar strong {
   color: var(--text);
+}
+
+.app-title {
+  /* Keeps its natural size; the user's name truncates instead. */
+  flex: 0 1 auto;
+  color: var(--text);
+  font-size: clamp(1.125rem, 2.5vw + 0.5rem, 1.5rem);
+  line-height: 1.2;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  /* Stays on the right on the queue page, where there's no title. */
+  margin-left: auto;
 }
 
 .badge.staff {
@@ -804,4 +954,25 @@ main.wide > .notice {
 
 a.button {
   text-decoration: none;
+}
+
+@media (max-width: 30rem) {
+  .user-bar {
+    gap: 0.5rem 0.75rem;
+    padding-top: 0.75rem;
+  }
+
+  .user-info {
+    gap: 0.5rem;
+  }
+
+  .signed-in-label {
+    display: none;
+  }
+
+  /* Next to the title there's no room for the name; the submit form shows
+     it, with the email, under "Submitting as". */
+  .app-title + .user-info .truncate {
+    display: none;
+  }
 }

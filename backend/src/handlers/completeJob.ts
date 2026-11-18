@@ -5,7 +5,8 @@ import { authorize } from "../lib/auth.js";
 import { ddb } from "../lib/aws.js";
 import { config } from "../lib/config.js";
 import { error, json } from "../lib/http.js";
-import type { Job, JobSummary } from "../types.js";
+import { toSummary } from "../lib/jobs.js";
+import type { Job } from "../types.js";
 
 // POST /jobs/{jobId}/complete (staff only)
 export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
@@ -42,6 +43,5 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) 
     throw err;
   }
 
-  const { s3Key: _s3Key, ...summary } = job;
-  return json(200, { job: summary satisfies JobSummary });
+  return json(200, { job: toSummary(job) });
 };

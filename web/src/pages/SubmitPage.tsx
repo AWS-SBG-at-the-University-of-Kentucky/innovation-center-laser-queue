@@ -1,8 +1,9 @@
-import { type DragEvent, type FormEvent, useState } from "react";
+import { type DragEvent, type FormEvent, useEffect, useState } from "react";
 import {
   ALLOWED_EXTENSIONS,
   MAX_FILE_SIZE_BYTES,
   createJob,
+  getQueueLength,
   uploadFile,
 } from "../api";
 import { accountEmail, useAccount } from "../components/AuthGate";
@@ -24,7 +25,7 @@ type Status =
   | { state: "idle" }
   // progress is null until the S3 upload itself starts.
   | { state: "submitting"; progress: number | null }
-  | { state: "success"; fileName: string }
+  | { state: "success"; fileName: string; position: number }
   | { state: "error"; message: string };
 
 function checkFile(file: File): string | null {
@@ -39,6 +40,18 @@ function checkFile(file: File): string | null {
   return null;
 }
 
+const ordinalRules = new Intl.PluralRules("en-US", { type: "ordinal" });
+const ORDINAL_SUFFIX: Partial<Record<Intl.LDMLPluralRule, string>> = {
+  one: "st",
+  two: "nd",
+  few: "rd",
+};
+
+/** 1 → "1st", 2 → "2nd", 8 → "8th", 22 → "22nd". */
+function ordinal(n: number) {
+  return `${n}${ORDINAL_SUFFIX[ordinalRules.select(n)] ?? "th"}`;
+}
+
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
@@ -50,6 +63,22 @@ export function SubmitPage() {
   const [status, setStatus] = useState<Status>({ state: "idle" });
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
+  // null while loading, or if it failed: the count is a nice-to-have, so the
+  // page just leaves it out rather than showing an error.
+  const [queueLength, setQueueLength] = useState<number | null>(null);
+
+  // Reloads after each successful submission so the count includes it.
+  const submittedFile = status.state === "success" ? status.fileName : null;
+  useEffect(() => {
+    let cancelled = false;
+    getQueueLength().then(
+      ({ queued }) => !cancelled && setQueueLength(queued),
+      () => !cancelled && setQueueLength(null),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [submittedFile]);
 
   const submitting = status.state === "submitting";
   const percent =
@@ -95,7 +124,7 @@ export function SubmitPage() {
     }
     setStatus({ state: "submitting", progress: null });
     try {
-      const { uploadUrl } = await createJob({
+      const { uploadUrl, position } = await createJob({
         fileName: file.name,
         fileSize: file.size,
       });
@@ -103,7 +132,7 @@ export function SubmitPage() {
         setStatus({ state: "submitting", progress }),
       );
       setFile(null);
-      setStatus({ state: "success", fileName: file.name });
+      setStatus({ state: "success", fileName: file.name, position });
     } catch (err) {
       setStatus({
         state: "error",
@@ -114,17 +143,24 @@ export function SubmitPage() {
 
   return (
     <main>
-      <header className="hero">
-        <h1>Innovation Center Laser Queue</h1>
-        <p>Submit a file for laser cutting.</p>
-      </header>
-
+      {/* The page's h1 is the site title in the top bar (AuthGate). */}
       <PresenceNotice />
 
       {status.state === "success" ? (
         <section className="card success-panel" role="status">
           <AnimatedCheck />
           <h2>Job submitted</h2>
+          <p className="queue-position">
+            {status.position === 1 ? (
+              <>
+                You're <strong>next</strong> in line
+              </>
+            ) : (
+              <>
+                You're <strong>{ordinal(status.position)}</strong> in line
+              </>
+            )}
+          </p>
           <p>
             <strong className="break-anywhere">{status.fileName}</strong> is in
             the laser queue. Innovation Center staff will cut it in the order
@@ -140,7 +176,17 @@ export function SubmitPage() {
         </section>
       ) : (
         <section className="card">
-          <h2 className="card-header">Submit a New Job</h2>
+          <div className="card-header split">
+            <h2>Submit a New Job</h2>
+            {queueLength !== null && (
+              <p className="queue-length">
+                <span className="queue-length-dot" aria-hidden="true" />
+                {queueLength === 0
+                  ? "No one in line"
+                  : `${queueLength} ${queueLength === 1 ? "job" : "jobs"} in line`}
+              </p>
+            )}
+          </div>
           <form className="card-body" onSubmit={handleSubmit}>
             {/* The API takes these from the sign-in token, not the form. */}
             <div className="field">
@@ -224,9 +270,18 @@ export function SubmitPage() {
                     />
                     <UploadCloudIcon />
                     <span>
-                      {dragging
-                        ? "Drop your file to add it"
-                        : "Drag and drop your file here, or click to browse"}
+                      {dragging ? (
+                        "Drop your file to add it"
+                      ) : (
+                        <>
+                          <span className="pointer-only">
+                            Drag and drop your file here, or click to browse
+                          </span>
+                          <span className="touch-only">
+                            Tap to choose a file
+                          </span>
+                        </>
+                      )}
                     </span>
                     <small>
                       Accepted file types: {ACCEPT_LABEL} — up to{" "}

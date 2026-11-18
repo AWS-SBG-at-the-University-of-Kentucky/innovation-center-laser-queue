@@ -6,6 +6,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { useLocation } from "react-router-dom";
 import { initAuth, isStaff, keepsSignedIn, signIn, signOut } from "../auth";
 import { AlertIcon, Spinner } from "../icons";
 
@@ -24,7 +25,10 @@ export function useAccount(): AccountInfo {
   return account;
 }
 
-/** The linkblue email the API records for this account (backend auth.ts). */
+/**
+ * The account's linkblue email, shown so students can see which account
+ * they're using. Display only: the API never stores it.
+ */
 export function accountEmail(account: AccountInfo): string {
   return account.username.toLowerCase();
 }
@@ -34,6 +38,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>({ status: "loading" });
   const [redirecting, setRedirecting] = useState(false);
   const [keepSignedIn, setKeepSignedIn] = useState(keepsSignedIn);
+  // The submit page uses the site title in the top bar as its heading; the
+  // queue page has its own.
+  const showTitle = useLocation().pathname === "/submit";
 
   useEffect(() => {
     initAuth().then(
@@ -66,20 +73,26 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (state.status === "signedIn") {
     return (
       <AccountContext.Provider value={state.account}>
-        <div className="user-bar">
-          <span className="truncate">
-            Signed in as <strong>{state.account.name ?? state.account.username}</strong>
-          </span>
-          {isStaff(state.account) && <span className="badge staff">STAFF</span>}
-          <button
-            type="button"
-            className="button secondary small"
-            onClick={() => redirect(signOut)}
-            disabled={redirecting}
-          >
-            Sign out
-          </button>
-        </div>
+        <header className="user-bar">
+          {showTitle && <h1 className="app-title">Innovation Center Laser Queue</h1>}
+          <div className="user-info">
+            <span className="truncate">
+              <span className="signed-in-label">Signed in as </span>
+              <strong>{state.account.name ?? state.account.username}</strong>
+            </span>
+            {isStaff(state.account) && (
+              <span className="badge staff">STAFF</span>
+            )}
+            <button
+              type="button"
+              className="button secondary small"
+              onClick={() => redirect(signOut)}
+              disabled={redirecting}
+            >
+              Sign out
+            </button>
+          </div>
+        </header>
         {children}
       </AccountContext.Provider>
     );
