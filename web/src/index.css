@@ -9,38 +9,51 @@
   line-height: 1.5;
   color-scheme: light dark;
 
-  --bg: #f5f7fb;
+  /* University of Kentucky palette: Wildcat Blue (#0033a0, PMS 286) leads,
+     Sky (#b1c9e8) tints. See brand.uky.edu/our-identity/color-palette. */
+  --wildcat-blue: #0033a0;
+  --bg: #f4f6fa;
   --surface: #ffffff;
-  --surface-tint: #edf3fc;
-  --surface-sunken: #f8fafd;
-  --border: #dbe3ee;
-  --text: #0f1b33;
-  --muted: #5b6b85;
-  --primary: #3b7ddd;
-  --primary-hover: #2f6bc6;
-  --primary-soft: #e1ecfb;
-  --primary-text: #1f5fbf;
+  --surface-tint: #eef3fa;
+  --surface-sunken: #f7f9fc;
+  --border: #d9e1ec;
+  --text: #0b1a3a;
+  --muted: #56637d;
+  --primary: var(--wildcat-blue);
+  --primary-hover: #00287f;
+  /* Sky mixed with white. */
+  --primary-soft: #e4ecf7;
+  --primary-text: var(--wildcat-blue);
   --success: #1f8a4c;
   --success-soft: #dcf3e4;
   --danger: #c62828;
   --danger-soft: #fdecec;
-  --shadow: 0 1px 2px rgb(15 27 51 / 6%), 0 4px 16px rgb(15 27 51 / 5%);
+  --shadow: 0 1px 2px rgb(11 26 58 / 6%), 0 4px 16px rgb(11 26 58 / 6%);
   --radius: 0.75rem;
+
+  /* The top bar is Wildcat Blue in both themes. */
+  --bar-bg: var(--wildcat-blue);
+  --bar-text: #ffffff;
+  --bar-muted: rgb(255 255 255 / 80%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0d131e;
-    --surface: #161e2c;
-    --surface-tint: #1b2638;
-    --surface-sunken: #121a27;
-    --border: #2a3649;
-    --text: #e8eef8;
-    --muted: #93a2ba;
-    --primary: #4688e4;
-    --primary-hover: #5b98ee;
-    --primary-soft: #1d2f4c;
-    --primary-text: #8db9f5;
+    --bg: #0a1020;
+    --surface: #121a2d;
+    --surface-tint: #18233b;
+    --surface-sunken: #0e1527;
+    --border: #263252;
+    --text: #e9eef8;
+    --muted: #97a3bd;
+    /* Every blue here is Wildcat Blue's hue at a different depth, so the bar,
+       buttons and tints read as one colour. Full-strength Wildcat Blue is too
+       dark to read on these surfaces, and too loud as a band across the top. */
+    --primary: #1f56c8;
+    --primary-hover: #2d63d6;
+    --primary-soft: #13254f;
+    --primary-text: #b1c9e8;
+    --bar-bg: #061e53;
     --success: #5fce8c;
     --success-soft: #163524;
     --danger: #ef7b7b;
@@ -178,10 +191,11 @@ small {
 
 .page-header {
   display: flex;
-  align-items: flex-end;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
 }
 
 /* Card */
@@ -385,7 +399,7 @@ small {
   width: 2.25rem;
   height: 2.25rem;
   margin-bottom: 0.25rem;
-  color: var(--primary);
+  color: var(--primary-text);
   stroke-width: 1.5;
   transition: transform 0.2s;
 }
@@ -648,9 +662,17 @@ main.wide > .notice {
   margin: 2.5rem 0 0.75rem;
 }
 
-.section-header span {
+.section-header span,
+.section-title span {
   color: var(--muted);
   font-size: 0.875rem;
+}
+
+.section-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.5rem;
 }
 
 /* Confirmation dialog */
@@ -838,11 +860,6 @@ main.wide > .notice {
     margin-bottom: 1.5rem;
   }
 
-  .page-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
   .card-header {
     padding: 0.875rem 1rem;
   }
@@ -896,22 +913,46 @@ main.wide > .notice {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem 1.5rem;
-  max-width: 68rem;
-  margin: 0 auto;
-  padding: 1rem max(1rem, env(safe-area-inset-right)) 0
-    max(1rem, env(safe-area-inset-left));
+  /* Full-width band; the padding lines its content up with the 68rem pages. */
+  padding: 0.75rem
+    max(1rem, env(safe-area-inset-right), calc((100% - 66rem) / 2));
+  padding-left: max(
+    1rem,
+    env(safe-area-inset-left),
+    calc((100% - 66rem) / 2)
+  );
+  background: var(--bar-bg);
+  color: var(--bar-muted);
   font-size: 0.875rem;
-  color: var(--muted);
 }
 
 .user-bar strong {
-  color: var(--text);
+  color: var(--bar-text);
+}
+
+.user-bar .badge.staff {
+  background: rgb(255 255 255 / 16%);
+  color: var(--bar-text);
+}
+
+.user-bar .button.secondary {
+  background: transparent;
+  color: var(--bar-text);
+  border-color: rgb(255 255 255 / 45%);
+}
+
+.user-bar .button.secondary:hover:not(:disabled) {
+  background: rgb(255 255 255 / 12%);
+}
+
+.user-bar .button:focus-visible {
+  outline-color: var(--bar-text);
 }
 
 .app-title {
   /* Keeps its natural size; the user's name truncates instead. */
   flex: 0 1 auto;
-  color: var(--text);
+  color: var(--bar-text);
   font-size: clamp(1.125rem, 2.5vw + 0.5rem, 1.5rem);
   line-height: 1.2;
 }
@@ -921,7 +962,6 @@ main.wide > .notice {
   align-items: center;
   gap: 0.75rem;
   min-width: 0;
-  /* Stays on the right on the queue page, where there's no title. */
   margin-left: auto;
 }
 
@@ -959,7 +999,7 @@ a.button {
 @media (max-width: 30rem) {
   .user-bar {
     gap: 0.5rem 0.75rem;
-    padding-top: 0.75rem;
+    padding-block: 0.625rem;
   }
 
   .user-info {

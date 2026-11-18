@@ -6,7 +6,6 @@ import {
   useEffect,
   useState,
 } from "react";
-import { useLocation } from "react-router-dom";
 import { initAuth, isStaff, keepsSignedIn, signIn, signOut } from "../auth";
 import { AlertIcon, Spinner } from "../icons";
 
@@ -38,9 +37,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>({ status: "loading" });
   const [redirecting, setRedirecting] = useState(false);
   const [keepSignedIn, setKeepSignedIn] = useState(keepsSignedIn);
-  // The submit page uses the site title in the top bar as its heading; the
-  // queue page has its own.
-  const showTitle = useLocation().pathname === "/submit";
 
   useEffect(() => {
     initAuth().then(
@@ -74,7 +70,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return (
       <AccountContext.Provider value={state.account}>
         <header className="user-bar">
-          {showTitle && <h1 className="app-title">Innovation Center Laser Queue</h1>}
+          {/* The h1 for every signed-in page; pages start at h2. */}
+          <h1 className="app-title">Innovation Center Laser Queue</h1>
           <div className="user-info">
             <span className="truncate">
               <span className="signed-in-label">Signed in as </span>

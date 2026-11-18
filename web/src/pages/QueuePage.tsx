@@ -309,14 +309,17 @@ export function QueuePage() {
 
   return (
     <main className="wide">
+      <PresenceNotice />
+
+      {/* The page title is in the top bar (AuthGate). */}
       <header className="page-header">
-        <div>
-          <h1>Laser Queue</h1>
-          <p>
+        <div className="section-title">
+          <h2>Waiting</h2>
+          <span>
             {queued
-              ? `${queued.length} ${queued.length === 1 ? "job" : "jobs"} waiting, oldest first.`
-              : "Jobs waiting to be cut, oldest first."}
-          </p>
+              ? `${queued.length} ${queued.length === 1 ? "job" : "jobs"}, oldest first`
+              : "Oldest first"}
+          </span>
         </div>
         <button
           type="button"
@@ -328,8 +331,6 @@ export function QueuePage() {
           Refresh
         </button>
       </header>
-
-      <PresenceNotice />
 
       {error && (
         <p className="notice error" role="alert">
