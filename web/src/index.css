@@ -35,6 +35,15 @@
   --bar-bg: var(--wildcat-blue);
   --bar-text: #ffffff;
   --bar-muted: rgb(255 255 255 / 80%);
+
+  /* Charts. One blue ramp, light (few) to dark (many); empty days are a
+     step off the surface. */
+  --chart-bar: var(--wildcat-blue);
+  --heat-0: #e9eef5;
+  --heat-1: #b7d3f6;
+  --heat-2: #6da7ec;
+  --heat-3: #2a78d6;
+  --heat-4: var(--wildcat-blue);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -59,6 +68,13 @@
     --danger: #ef7b7b;
     --danger-soft: #3a1c1f;
     --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 4px 16px rgb(0 0 0 / 25%);
+    /* Selected for the dark surface: more is brighter. */
+    --chart-bar: #5598e7;
+    --heat-0: #1a2540;
+    --heat-1: #104281;
+    --heat-2: #1c5cab;
+    --heat-3: #3987e5;
+    --heat-4: #9ec5f4;
   }
 }
 
@@ -910,6 +926,7 @@ main.wide > .notice {
 
 .user-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem 1.5rem;
@@ -1015,4 +1032,466 @@ a.button {
   .app-title + .user-info .truncate {
     display: none;
   }
+}
+
+/* Staff page links in the top bar */
+
+.app-nav {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.app-nav a {
+  padding: 0.375rem 0.75rem;
+  color: var(--bar-muted);
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 0.5rem;
+  transition: background-color 0.15s;
+}
+
+.app-nav a:hover {
+  background: rgb(255 255 255 / 10%);
+  color: var(--bar-text);
+}
+
+.app-nav a.active {
+  background: rgb(255 255 255 / 18%);
+  color: var(--bar-text);
+}
+
+.app-nav a:focus-visible {
+  outline: 2px solid var(--bar-text);
+  outline-offset: 2px;
+}
+
+/* Too narrow for title, links and user on one line: links get their own. */
+@media (max-width: 60rem) {
+  .app-nav {
+    order: 3;
+    flex-basis: 100%;
+    margin-inline: -0.75rem;
+  }
+}
+
+/* Analytics */
+
+.analytics {
+  display: grid;
+  /* minmax(0, …) so the heat map scrolls inside its card instead of
+     widening the page. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.analytics h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.analytics-section {
+  margin-top: 1rem !important;
+}
+
+.headline {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 1.5rem 2.5rem;
+  padding: 1.75rem;
+}
+
+.headline-figure {
+  display: grid;
+  align-content: center;
+  gap: 0.25rem;
+}
+
+.hero-number {
+  color: var(--primary-text);
+  font-size: clamp(3rem, 8vw, 4.5rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.hero-label {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.hero-sub {
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.talking-points {
+  padding-left: 2.5rem;
+  border-left: 1px solid var(--border);
+}
+
+.talking-points-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.talking-points ul {
+  display: grid;
+  gap: 0.375rem;
+  margin: 0;
+  padding-left: 1.125rem;
+  color: var(--muted);
+}
+
+.talking-points li::marker {
+  color: var(--primary-text);
+}
+
+@media (max-width: 48rem) {
+  .headline {
+    grid-template-columns: 1fr;
+    padding: 1.25rem;
+  }
+
+  .talking-points {
+    padding: 1.25rem 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+}
+
+.stat-grid,
+.record-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.stat-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(9.5rem, 100%), 1fr));
+}
+
+.record-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
+}
+
+.stat-tile {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  padding: 1rem 1.25rem;
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.stat-sub {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.chart-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+  gap: 1rem;
+}
+
+.chart-card {
+  /* Tooltips may hang over the card's edge. */
+  overflow: visible;
+  padding: 1.25rem;
+}
+
+.chart-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.chart-header p {
+  margin-top: 0.125rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.select select {
+  padding: 0.375rem 0.625rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+
+.select select:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Hover tooltip */
+
+.chart-tip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  padding: 0.375rem 0.625rem;
+  background: var(--text);
+  color: var(--surface);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  border-radius: 0.375rem;
+  box-shadow: var(--shadow);
+  transform: translate(-50%, calc(-100% - 0.5rem));
+  pointer-events: none;
+}
+
+.chart-tip.below {
+  transform: translate(-50%, 0.5rem);
+}
+
+.chart-tip span {
+  opacity: 0.8;
+}
+
+/* Calendar heat map */
+
+.heatmap-scroll {
+  overflow-x: auto;
+  /* Room for the tooltip above the top row. */
+  padding-block: 0.25rem;
+}
+
+.heatmap {
+  position: relative;
+  display: grid;
+  gap: 3px;
+}
+
+.heatmap-month,
+.heatmap-weekday {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.heatmap-month {
+  padding-bottom: 0.25rem;
+}
+
+.heatmap-weekday {
+  align-self: center;
+}
+
+.heat-cell {
+  aspect-ratio: 1;
+  border-radius: 3px;
+}
+
+.heatmap .heat-cell:hover {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+
+.level-0 {
+  background: var(--heat-0);
+}
+
+.level-1 {
+  background: var(--heat-1);
+}
+
+.level-2 {
+  background: var(--heat-2);
+}
+
+.level-3 {
+  background: var(--heat-3);
+}
+
+.level-4 {
+  background: var(--heat-4);
+}
+
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  margin-top: 0.75rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.heatmap-legend .heat-cell {
+  width: 0.75rem;
+}
+
+.heatmap-legend span:first-child {
+  margin-right: 0.25rem;
+}
+
+.heatmap-legend span:last-child {
+  margin-left: 0.25rem;
+}
+
+/* Column charts */
+
+.column-chart {
+  position: relative;
+}
+
+.plot {
+  position: relative;
+  height: 12rem;
+  /* Room for the y-axis labels. */
+  margin-left: 2.25rem;
+}
+
+.gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--border);
+}
+
+.gridline span {
+  position: absolute;
+  right: calc(100% + 0.5rem);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.columns {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+.column {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 0;
+}
+
+.column:hover {
+  background: color-mix(in srgb, var(--surface-tint) 70%, transparent);
+}
+
+.bar {
+  width: min(1.5rem, 70%);
+  background: var(--chart-bar);
+  /* Rounded at the data end, square on the baseline. */
+  border-radius: 4px 4px 0 0;
+}
+
+.bar:not(.zero) {
+  min-height: 2px;
+}
+
+.cap-label {
+  position: absolute;
+  left: 50%;
+  padding-bottom: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  transform: translateX(-50%);
+}
+
+.column-labels {
+  display: flex;
+  margin-left: 2.25rem;
+  padding-top: 0.375rem;
+}
+
+.column-labels span {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-align: center;
+  white-space: nowrap;
+}
+
+@media (max-width: 30rem) {
+  .chart-card {
+    padding: 1rem;
+  }
+
+  .column-labels span {
+    font-size: 0.6875rem;
+  }
+}
+
+/* Table view under a chart */
+
+.table-view {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+}
+
+.table-view summary {
+  color: var(--primary-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.table-view table {
+  width: 100%;
+  margin-top: 0.75rem;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.table-view th,
+.table-view td {
+  padding: 0.375rem 0.5rem;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+
+.table-view th:first-child {
+  text-align: left;
+}
+
+.table-view thead th {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.table-view tbody th {
+  font-weight: 400;
+}
+
+.analytics .skeleton {
+  margin: 0;
+}
+
+.empty-state .icon {
+  margin-inline: auto;
 }

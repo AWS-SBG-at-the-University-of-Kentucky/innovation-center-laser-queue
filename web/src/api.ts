@@ -8,6 +8,10 @@ export type FileExtension = (typeof ALLOWED_EXTENSIONS)[number];
 // is what enforces it.
 export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
+// Mirrors QUEUED_JOB_MAX_AGE_DAYS in infra/lib/laser-queue-stack.ts; the
+// weekly cleanup is what enforces it. Shown to staff on the queue page.
+export const QUEUED_JOB_MAX_AGE_DAYS = 14;
+
 export interface Job {
   jobId: string;
   studentName: string;
@@ -16,6 +20,38 @@ export interface Job {
   status: "QUEUED" | "COMPLETED";
   createdAt: string;
   completedAt?: string;
+}
+
+// GET /analytics. Mirrors backend/src/types.ts — keep the two in sync.
+
+/** Activity on one day, in the lab's time zone. */
+export interface DayActivity {
+  /** YYYY-MM-DD in `Analytics.timeZone`. */
+  date: string;
+  /** Jobs submitted that day. */
+  submitted: number;
+  /** Jobs marked completed (cut) that day. */
+  cut: number;
+}
+
+export interface Analytics {
+  /** IANA time zone every date and hour below is in (the lab's). */
+  timeZone: string;
+  /** Today's date in `timeZone`, YYYY-MM-DD. */
+  today: string;
+  /** Jobs waiting right now. */
+  queued: number;
+  /** Jobs cleared from the queue for waiting too long, never cut. */
+  expired: number;
+  /** Days with at least one submission or cut, oldest first. */
+  days: DayActivity[];
+  /** Submissions by hour of day (index 0 = midnight), all time. */
+  submittedByHour: number[];
+  /** Median time from submission to being marked completed. */
+  medianWaitMinutes: {
+    allTime: number | null;
+    last30Days: number | null;
+  };
 }
 
 // The student's name comes from their sign-in token.
@@ -93,6 +129,11 @@ export function completeJob(jobId: string) {
 /** Removes the job and its file. The backend only allows this once completed. */
 export function deleteJob(jobId: string) {
   return request<null>(`/jobs/${jobId}`, { method: "DELETE" });
+}
+
+/** Usage counts for the analytics page. Staff only. */
+export function getAnalytics() {
+  return request<Analytics>("/analytics");
 }
 
 export function getDownloadUrl(jobId: string) {

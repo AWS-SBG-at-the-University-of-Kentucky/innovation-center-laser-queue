@@ -8,6 +8,7 @@ import {
 } from "react";
 import { initAuth, isStaff, keepsSignedIn, signIn, signOut } from "../auth";
 import { AlertIcon, Spinner } from "../icons";
+import { StaffNav } from "./StaffNav";
 
 type State =
   | { status: "loading" }
@@ -72,6 +73,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
         <header className="user-bar">
           {/* The h1 for every signed-in page; pages start at h2. */}
           <h1 className="app-title">Innovation Center Laser Queue</h1>
+          {/* Students only have the submit page, so they get no nav. */}
+          {isStaff(state.account) && <StaffNav />}
           <div className="user-info">
             <span className="truncate">
               <span className="signed-in-label">Signed in as </span>

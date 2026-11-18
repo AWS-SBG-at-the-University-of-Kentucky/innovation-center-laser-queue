@@ -3,6 +3,7 @@ import { Link, Navigate, Route, Routes } from "react-router-dom";
 import { isStaff } from "./auth";
 import { AuthGate, useAccount } from "./components/AuthGate";
 import { InboxIcon } from "./icons";
+import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { QueuePage } from "./pages/QueuePage";
 import { SubmitPage } from "./pages/SubmitPage";
 
@@ -19,7 +20,7 @@ function StaffOnly({ children }: { children: ReactNode }) {
         <InboxIcon />
         <h2>Staff only</h2>
         <p>
-          The queue is for Innovation Center staff. If you were just given
+          This page is for Innovation Center staff. If you were just given
           access, sign out and back in.
         </p>
         <Link className="button" to="/submit">
@@ -40,6 +41,14 @@ export function App() {
           element={
             <StaffOnly>
               <QueuePage />
+            </StaffOnly>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <StaffOnly>
+              <AnalyticsPage />
             </StaffOnly>
           }
         />

@@ -1,13 +1,15 @@
-import { DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { DeleteCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyHandlerV2WithJWTAuthorizer } from "aws-lambda";
 import { authorize } from "../lib/auth.js";
-import { ddb, s3 } from "../lib/aws.js";
+import { ddb } from "../lib/aws.js";
 import { config } from "../lib/config.js";
 import { error } from "../lib/http.js";
-import type { Job } from "../types.js";
+import { archiveJob } from "../lib/jobs.js";
+import type { JobRecord } from "../types.js";
 
 // DELETE /jobs/{jobId} (staff only)
+// Deletes the file and the student's details, but keeps the job's timestamps
+// as an ArchivedJob so analytics can still count it.
 export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
   const auth = authorize(event, { staffOnly: true });
   if (!auth.ok) return auth.response;
@@ -18,21 +20,15 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) 
   const { Item } = await ddb.send(
     new GetCommand({ TableName: config.tableName, Key: { jobId } }),
   );
-  if (!Item) return error(404, "Job not found.");
-  const job = Item as Job;
+  const job = Item as JobRecord | undefined;
+  if (!job || job.status === "ARCHIVED") return error(404, "Job not found.");
 
   if (job.status !== "COMPLETED") {
     return error(409, "Only completed jobs can be deleted.");
   }
 
-  // File first: if this fails the record is still there, so the delete can be
-  // retried instead of leaving an orphaned file behind.
-  await s3.send(
-    new DeleteObjectCommand({ Bucket: config.bucketName, Key: job.s3Key }),
-  );
-  await ddb.send(
-    new DeleteCommand({ TableName: config.tableName, Key: { jobId } }),
-  );
+  // If another request archived it first, the end result is the same.
+  await archiveJob(job);
 
   return { statusCode: 204 };
 };
