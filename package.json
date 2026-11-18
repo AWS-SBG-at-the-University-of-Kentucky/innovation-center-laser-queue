@@ -19,6 +19,7 @@
     "deploy:dev": "node scripts/deploy.mjs dev",
     "deploy:prod": "node scripts/deploy.mjs prod",
     "test:deploy": "node --test scripts/deploy.test.mjs",
-    "reset:dev": "npm run reset:dev -w backend --"
+    "reset:dev": "npm run reset:dev -w backend --",
+    "strip-student-ids": "npm run strip-student-ids -w backend --"
   }
 }

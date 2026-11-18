@@ -9,38 +9,51 @@
   line-height: 1.5;
   color-scheme: light dark;
 
-  --bg: #f5f7fb;
+  /* University of Kentucky palette: Wildcat Blue (#0033a0, PMS 286) leads,
+     Sky (#b1c9e8) tints. See brand.uky.edu/our-identity/color-palette. */
+  --wildcat-blue: #0033a0;
+  --bg: #f4f6fa;
   --surface: #ffffff;
-  --surface-tint: #edf3fc;
-  --surface-sunken: #f8fafd;
-  --border: #dbe3ee;
-  --text: #0f1b33;
-  --muted: #5b6b85;
-  --primary: #3b7ddd;
-  --primary-hover: #2f6bc6;
-  --primary-soft: #e1ecfb;
-  --primary-text: #1f5fbf;
+  --surface-tint: #eef3fa;
+  --surface-sunken: #f7f9fc;
+  --border: #d9e1ec;
+  --text: #0b1a3a;
+  --muted: #56637d;
+  --primary: var(--wildcat-blue);
+  --primary-hover: #00287f;
+  /* Sky mixed with white. */
+  --primary-soft: #e4ecf7;
+  --primary-text: var(--wildcat-blue);
   --success: #1f8a4c;
   --success-soft: #dcf3e4;
   --danger: #c62828;
   --danger-soft: #fdecec;
-  --shadow: 0 1px 2px rgb(15 27 51 / 6%), 0 4px 16px rgb(15 27 51 / 5%);
+  --shadow: 0 1px 2px rgb(11 26 58 / 6%), 0 4px 16px rgb(11 26 58 / 6%);
   --radius: 0.75rem;
+
+  /* The top bar is Wildcat Blue in both themes. */
+  --bar-bg: var(--wildcat-blue);
+  --bar-text: #ffffff;
+  --bar-muted: rgb(255 255 255 / 80%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0d131e;
-    --surface: #161e2c;
-    --surface-tint: #1b2638;
-    --surface-sunken: #121a27;
-    --border: #2a3649;
-    --text: #e8eef8;
-    --muted: #93a2ba;
-    --primary: #4688e4;
-    --primary-hover: #5b98ee;
-    --primary-soft: #1d2f4c;
-    --primary-text: #8db9f5;
+    --bg: #0a1020;
+    --surface: #121a2d;
+    --surface-tint: #18233b;
+    --surface-sunken: #0e1527;
+    --border: #263252;
+    --text: #e9eef8;
+    --muted: #97a3bd;
+    /* Every blue here is Wildcat Blue's hue at a different depth, so the bar,
+       buttons and tints read as one colour. Full-strength Wildcat Blue is too
+       dark to read on these surfaces, and too loud as a band across the top. */
+    --primary: #1f56c8;
+    --primary-hover: #2d63d6;
+    --primary-soft: #13254f;
+    --primary-text: #b1c9e8;
+    --bar-bg: #061e53;
     --success: #5fce8c;
     --success-soft: #163524;
     --danger: #ef7b7b;
@@ -55,6 +68,12 @@
   box-sizing: border-box;
 }
 
+html {
+  /* Stops iOS from enlarging text when the phone is rotated. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -64,7 +83,10 @@ body {
 main {
   max-width: 40rem;
   margin: 0 auto;
-  padding: 3rem 1rem 4rem;
+  /* Insets keep content clear of the notch with viewport-fit=cover. */
+  padding: clamp(1.5rem, 6vw, 3rem) max(1rem, env(safe-area-inset-right))
+    calc(3rem + env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
 }
 
 main.wide {
@@ -78,9 +100,10 @@ p {
 }
 
 h1 {
-  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  font-size: clamp(1.625rem, 5vw, 2.5rem);
   line-height: 1.15;
   letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 
 h2 {
@@ -139,18 +162,51 @@ small {
 }
 
 .hero p {
-  font-size: 1.125rem;
+  font-size: clamp(1rem, 3vw, 1.125rem);
+  text-wrap: pretty;
+}
+
+.queue-length {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  background: var(--primary-soft);
+  color: var(--primary-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  border-radius: 1rem;
+  animation: pop-in 0.2s ease-out;
+}
+
+.queue-length-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  background: var(--success);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--success-soft);
 }
 
 .page-header {
   display: flex;
-  align-items: flex-end;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
 }
 
 /* Card */
+
+.card-header.split {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
 
 .card {
   background: var(--surface);
@@ -343,7 +399,7 @@ small {
   width: 2.25rem;
   height: 2.25rem;
   margin-bottom: 0.25rem;
-  color: var(--primary);
+  color: var(--primary-text);
   stroke-width: 1.5;
   transition: transform 0.2s;
 }
@@ -357,6 +413,21 @@ small {
 
 .dragging .dropzone .icon {
   transform: translateY(-3px);
+}
+
+/* Phones and tablets can't drag files in, so they get a tap prompt. */
+.touch-only {
+  display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .touch-only {
+    display: inline;
+  }
+
+  .pointer-only {
+    display: none;
+  }
 }
 
 .file-card {
@@ -452,7 +523,8 @@ small {
 }
 
 .hero + .notice,
-.page-header + .notice {
+.page-header + .notice,
+main > .notice:first-child {
   margin-bottom: 1.5rem;
 }
 
@@ -494,6 +566,16 @@ main.wide > .notice {
 
 .success-panel p strong {
   color: var(--text);
+}
+
+.success-panel .queue-position {
+  color: var(--text);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.success-panel .queue-position strong {
+  color: var(--primary-text);
 }
 
 .success-panel .button {
@@ -538,10 +620,18 @@ main.wide > .notice {
 
 .queue-table {
   width: 100%;
-  min-width: 52rem;
+  min-width: 44rem;
   border-collapse: collapse;
   /* Fixed layout so long names truncate rather than widen their column. */
   table-layout: fixed;
+}
+
+.queue-table.numbered {
+  min-width: 47rem;
+}
+
+.col-position {
+  width: 3.75rem;
 }
 
 .col-submitted {
@@ -549,11 +639,7 @@ main.wide > .notice {
 }
 
 .col-student {
-  width: 16%;
-}
-
-.col-email {
-  width: 23%;
+  width: 26%;
 }
 
 .col-status {
@@ -576,9 +662,17 @@ main.wide > .notice {
   margin: 2.5rem 0 0.75rem;
 }
 
-.section-header span {
+.section-header span,
+.section-title span {
   color: var(--muted);
   font-size: 0.875rem;
+}
+
+.section-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.5rem;
 }
 
 /* Confirmation dialog */
@@ -661,6 +755,28 @@ main.wide > .notice {
   color: var(--success);
 }
 
+/* Place in line on the queue table. */
+.position {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding-inline: 0.5rem;
+  background: var(--surface-tint);
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+
+.position.next {
+  background: var(--primary);
+  color: #fff;
+  border-color: transparent;
+}
+
 .skeleton {
   display: block;
   height: 0.875rem;
@@ -740,12 +856,163 @@ main.wide > .notice {
 }
 
 @media (max-width: 30rem) {
-  main {
-    padding-top: 2rem;
+  .hero {
+    margin-bottom: 1.5rem;
   }
 
-  .page-header {
-    align-items: flex-start;
-    flex-direction: column;
+  .card-header {
+    padding: 0.875rem 1rem;
+  }
+
+  .card-body {
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .dropzone {
+    padding: 1.5rem 0.75rem;
+  }
+
+  .file-card {
+    gap: 0.625rem;
+    padding: 0.75rem;
+  }
+
+  .success-panel,
+  .empty-state {
+    padding: 2rem 1rem;
+  }
+}
+
+/* Phones held sideways have little height to spare. */
+@media (max-height: 32rem) and (orientation: landscape) {
+  main {
+    padding-top: 1.25rem;
+  }
+
+  .hero {
+    margin-bottom: 1.25rem;
+  }
+
+  .dropzone {
+    padding-block: 1.25rem;
+  }
+}
+
+/* Sign-in */
+
+.auth-loading {
+  display: grid;
+  place-items: center;
+  min-height: 50vh;
+  color: var(--muted);
+}
+
+.user-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  /* Full-width band; the padding lines its content up with the 68rem pages. */
+  padding: 0.75rem
+    max(1rem, env(safe-area-inset-right), calc((100% - 66rem) / 2));
+  padding-left: max(
+    1rem,
+    env(safe-area-inset-left),
+    calc((100% - 66rem) / 2)
+  );
+  background: var(--bar-bg);
+  color: var(--bar-muted);
+  font-size: 0.875rem;
+}
+
+.user-bar strong {
+  color: var(--bar-text);
+}
+
+.user-bar .badge.staff {
+  background: rgb(255 255 255 / 16%);
+  color: var(--bar-text);
+}
+
+.user-bar .button.secondary {
+  background: transparent;
+  color: var(--bar-text);
+  border-color: rgb(255 255 255 / 45%);
+}
+
+.user-bar .button.secondary:hover:not(:disabled) {
+  background: rgb(255 255 255 / 12%);
+}
+
+.user-bar .button:focus-visible {
+  outline-color: var(--bar-text);
+}
+
+.app-title {
+  /* Keeps its natural size; the user's name truncates instead. */
+  flex: 0 1 auto;
+  color: var(--bar-text);
+  font-size: clamp(1.125rem, 2.5vw + 0.5rem, 1.5rem);
+  line-height: 1.2;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.badge.staff {
+  flex: none;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+.checkbox input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.submitter {
+  min-width: 0;
+  padding: 0.625rem 0.75rem;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+
+a.button {
+  text-decoration: none;
+}
+
+@media (max-width: 30rem) {
+  .user-bar {
+    gap: 0.5rem 0.75rem;
+    padding-block: 0.625rem;
+  }
+
+  .user-info {
+    gap: 0.5rem;
+  }
+
+  .signed-in-label {
+    display: none;
+  }
+
+  /* Next to the title there's no room for the name; the submit form shows
+     it, with the email, under "Submitting as". */
+  .app-title + .user-info .truncate {
+    display: none;
   }
 }

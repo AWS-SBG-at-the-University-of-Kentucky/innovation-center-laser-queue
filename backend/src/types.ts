@@ -3,11 +3,15 @@ export type FileExtension = (typeof ALLOWED_EXTENSIONS)[number];
 
 export type JobStatus = "QUEUED" | "COMPLETED";
 
-/** One item in the LaserJobs table. */
+/**
+ * One item in the LaserJobs table. The only personal detail stored is the
+ * student's display name; their email and Entra ID are deliberately not kept.
+ * Records from before that change may still have `studentEmail`/`studentId`
+ * (see backend/scripts/strip-student-ids.ts).
+ */
 export interface Job {
   jobId: string;
   studentName: string;
-  studentEmail: string;
   originalFileName: string;
   /** jobs/{jobId}/{filename} */
   s3Key: string;

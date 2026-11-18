@@ -27,6 +27,8 @@ git-ignored.
 | Shared UI pieces                 | `web/src/components/`, `web/src/icons.tsx` |
 | Styles                           | `web/src/index.css`                      |
 | How the frontend calls the API   | `web/src/api.ts`                         |
+| Sign-in (MSAL, tokens, roles)    | `web/src/auth.ts`, `web/src/components/AuthGate.tsx` |
+| Who may call a route             | `backend/src/lib/auth.ts`                |
 | What an API route does           | `backend/src/handlers/`                  |
 | Input rules (lengths, file types) | `backend/src/lib/validation.ts`          |
 | The job record's fields          | `backend/src/types.ts` (and its copy in `web/src/api.ts`) |
@@ -37,12 +39,15 @@ git-ignored.
 ### Add an API route
 
 1. Create `backend/src/handlers/yourHandler.ts` exporting
-   `handler: APIGatewayProxyHandlerV2`. Copy an existing handler for the
-   pattern; use `json()` and `error()` from `lib/http.ts` for responses.
+   `handler: APIGatewayProxyHandlerV2WithJWTAuthorizer`. Copy an existing
+   handler for the pattern. Start it with
+   `authorize(event, { staffOnly: ... })` from `lib/auth.ts`, and use `json()`
+   and `error()` from `lib/http.ts` for responses.
 2. In `infra/lib/laser-queue-stack.ts`:
    - create the function with `handler("YourHandler", "yourHandler.ts")`,
    - grant only the access it needs (`table.grantReadData(...)`, etc.),
-   - add the route with `api.addRoutes(...)`,
+   - add the route with `api.addRoutes(...)` (it gets the Entra authorizer
+     automatically),
    - if it uses a new HTTP method, add it to `corsPreflight.allowMethods`.
 3. Add a client function to `web/src/api.ts`.
 4. Add the route to the API table in the README.
@@ -53,7 +58,8 @@ git-ignored.
 1. Add it to `Job` in `backend/src/types.ts` **and** in `web/src/api.ts`.
 2. Set it where jobs are created (`createJob.ts`) or updated.
 3. If students supply it, validate it in `lib/validation.ts` and add it to
-   `CreateJobRequest` in `web/src/api.ts`.
+   `CreateJobRequest` in `web/src/api.ts`. If it's about who the student is,
+   take it from the token (`authorize()` in `lib/auth.ts`) instead.
 4. Existing records won't have the field, so make it optional or handle it
    being missing.
 

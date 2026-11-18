@@ -9,12 +9,14 @@ commands, see the [README](../README.md). For how to make changes, see
 ```mermaid
 flowchart LR
   Browser["Browser<br/>(web/, hosted on Amplify)"]
-  API["HTTP API<br/>(API Gateway)"]
+  Entra["Microsoft Entra ID<br/>(UK tenant)"]
+  API["HTTP API<br/>(API Gateway + JWT authorizer)"]
   Lambdas["Lambda handlers<br/>(backend/src/handlers)"]
   DDB[("DynamoDB<br/>LaserJobs table")]
   S3[("S3<br/>JobFiles bucket")]
 
-  Browser -- JSON requests --> API --> Lambdas
+  Browser -- sign in --> Entra
+  Browser -- "JSON requests<br/>+ access token" --> API --> Lambdas
   Lambdas -- job records --> DDB
   Lambdas -- presigned URLs --> S3
   Browser -- "file upload / download<br/>(presigned URL)" --> S3
@@ -22,10 +24,13 @@ flowchart LR
 
 There are two pages:
 
-- **`/submit`** (`web/src/pages/SubmitPage.tsx`): students enter their name and
-  email and upload an `.ai` file.
+- **`/submit`** (`web/src/pages/SubmitPage.tsx`): signed-in students upload an
+  `.ai` file. Their name comes from their UK account. The page shows how
+  many jobs are in line and, after submitting, the student's place in line.
 - **`/queue`** (`web/src/pages/QueuePage.tsx`): staff on the lab PC see every
   job, download files, mark jobs completed, and delete completed jobs.
+
+Both pages are behind sign-in (`web/src/components/AuthGate.tsx`).
 
 All AWS resources are defined in one CDK stack,
 `infra/lib/laser-queue-stack.ts`. It is deployed twice, as `LaserQueue-dev` and
@@ -41,9 +46,9 @@ sequenceDiagram
   participant B as S3
   participant T as Staff (/queue)
 
-  S->>API: POST /jobs {name, email, fileName, fileSize}
-  API->>DB: put job (status QUEUED)
-  API-->>S: {jobId, uploadUrl}
+  S->>API: POST /jobs {fileName, fileSize} + token
+  API->>DB: put job (status QUEUED), count queue
+  API-->>S: {jobId, uploadUrl, position}
   S->>B: PUT file to uploadUrl
   T->>API: GET /jobs
   API-->>T: all jobs, oldest first
@@ -59,6 +64,70 @@ sequenceDiagram
 
 A job is either `QUEUED` or `COMPLETED`. Only completed jobs can be deleted,
 and deleting removes both the record and the file.
+
+## Authentication
+
+Users sign in with Microsoft Entra ID using the app registration **Innovation
+Center Queue** in the University of Kentucky tenant. There is no Cognito and
+no client secret: the browser gets tokens straight from Entra, and API Gateway
+checks them.
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant E as Entra ID (UK tenant)
+  participant G as API Gateway (JWT authorizer)
+  participant L as Lambda (lib/auth.ts)
+
+  B->>E: sign in (redirect, MSAL)
+  E-->>B: ID token + access token for api://<client-id>/access_as_user
+  B->>G: request with Authorization: Bearer <access token>
+  G->>G: check signature, expiry, issuer (UK tenant), audience (client ID)
+  G->>L: request + token claims
+  L->>L: check scope, member (not guest), Staff role if needed
+```
+
+Checks happen in two layers:
+
+1. **API Gateway** (`HttpJwtAuthorizer` in `infra/lib/laser-queue-stack.ts`)
+   is the default authorizer for every route. It rejects requests without a
+   valid token from the UK tenant issued for this app with **401**, before any
+   Lambda runs.
+2. **The handler** calls `authorize()` from `backend/src/lib/auth.ts` first. It
+   requires the `access_as_user` scope and `acct = 0` (a tenant member, not an
+   invited guest). For staff routes it also requires the `Staff` app role.
+   Failures return **403**.
+
+The frontend (`web/src/auth.ts`) uses `@azure/msal-browser` with redirect
+sign-in. MSAL clears its own token cache when the browser closes.
+
+**Staying signed in (lab PC).** The sign-in page has a "Keep this computer
+signed in" checkbox. It sets a `localStorage` flag that makes the site sign in
+automatically on every load. If the user also chose "Stay signed in" at
+Microsoft, Microsoft's persistent cookie lets that redirect come straight back
+without a password, so a browser restart needs no clicks at all. Signing out
+clears both. How long Microsoft's cookie lasts is set by UK IT's policies,
+not by this app. `request()` in `web/src/api.ts` attaches a fresh access
+token to every call. The queue page hides itself from non-staff, but that's
+only for a friendlier message: the API enforces the role either way.
+
+`createJob` takes the student's name from the token, not from the request
+body, so nobody can submit a job under someone else's name. The name is the
+only personal detail stored with a job. `authorize()` still reads the linkblue
+`preferred_username` and Entra object ID to check the caller, but they are not
+saved. The frontend shows the student their own email from MSAL so they know
+which account they're on.
+
+Entra settings this depends on (app registration unless noted):
+
+- **Authentication:** Single-page application redirect URIs for every frontend
+  origin (the Amplify URL and `http://localhost:5173`).
+- **Expose an API:** scope `access_as_user`.
+- **Manifest:** `requestedAccessTokenVersion: 2`. With v1 tokens the issuer
+  doesn't match and every request gets 401.
+- **App roles:** `Staff`, assigned to people under Enterprise applications.
+- **Token configuration:** optional claims `acct` and `email` on the access
+  token. Without `acct`, every request is rejected (it fails closed).
 
 ## Data model
 
@@ -95,9 +164,15 @@ checks for the file first and returns a clear 404 when it's missing.
 record is still there and staff can retry. Doing it the other way round could
 leave files in S3 that nothing points to.
 
-**`GET /jobs` scans the whole table.** That's fine at lab scale (hundreds of
+**`GET /jobs` scans the whole table**, and so do `GET /queue/length` and
+`createJob` (to count the queue). That's fine at lab scale (hundreds of
 jobs). If the table ever grows large, add a secondary index on `status` or
 `createdAt` and query that instead.
+
+**Authorization is checked in two places on purpose.** The JWT authorizer
+can't check app roles (only scopes), so the role check lives in the handlers.
+Making the authorizer the API's default means a new route can't be added
+without sign-in by accident.
 
 **Each Lambda gets only the permissions it needs.** See the `grant*` calls in
 the stack: for example, `listJobs` can only read the table.
@@ -118,11 +193,11 @@ point-in-time recovery. Dev has neither, so it can be torn down freely.
 
 ## Known limitations
 
-- **No authentication.** Anyone with the URL can view, complete and delete
-  jobs, including on `/queue`. This is the biggest gap to close before wider
-  use.
-- **CORS allows any origin** (`ALLOWED_ORIGINS` in the stack). There's a TODO
-  to restrict it to the Amplify URL.
+- **Any UK member can submit, not only students.** Faculty and staff accounts
+  can sign in too. Restricting to students would need a student group from UK
+  IT ("Assignment required" on the enterprise app).
+- **New staff must sign out and back in** before `/queue` works, because the
+  role is read from their token.
 - **No automated tests for the app itself.** CI type-checks every workspace,
   builds the frontend and synthesizes the CDK stack. Only `scripts/deploy.mjs`
   has tests.

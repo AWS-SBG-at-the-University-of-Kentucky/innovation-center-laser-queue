@@ -2,15 +2,20 @@ import { randomUUID } from "node:crypto";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
+import type { APIGatewayProxyHandlerV2WithJWTAuthorizer } from "aws-lambda";
+import { authorize } from "../lib/auth.js";
 import { ddb, s3 } from "../lib/aws.js";
 import { config } from "../lib/config.js";
 import { error, json } from "../lib/http.js";
+import { countQueued } from "../lib/jobs.js";
 import { validateCreateJob } from "../lib/validation.js";
 import type { Job } from "../types.js";
 
-// POST /jobs
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+// POST /jobs (any signed-in UK member)
+export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
+  const auth = authorize(event, { staffOnly: false });
+  if (!auth.ok) return auth.response;
+
   let body: unknown;
   try {
     body = JSON.parse(event.body ?? "");
@@ -25,8 +30,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const jobId = randomUUID();
   const job: Job = {
     jobId,
-    studentName: input.studentName,
-    studentEmail: input.studentEmail,
+    studentName: auth.user.name,
     originalFileName: input.fileName,
     s3Key: `jobs/${jobId}/${input.fileName}`,
     fileExtension: input.fileExtension,
@@ -51,5 +55,9 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
 
   await ddb.send(new PutCommand({ TableName: config.tableName, Item: job }));
 
-  return json(201, { jobId, uploadUrl });
+  // Counted after the put, so this job is included and two students
+  // submitting at the same moment don't both get the same place.
+  const position = await countQueued(job.createdAt);
+
+  return json(201, { jobId, uploadUrl, position });
 };

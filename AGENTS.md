@@ -22,6 +22,14 @@ only lists rules and gotchas.
 - New Lambdas need explicit `grant*` calls in the stack, or they fail with
   AccessDenied at runtime.
 - Never return `s3Key` from the API. Strip it to a `JobSummary`.
+- The Entra tenant and client IDs are duplicated in `web/src/auth.ts` and
+  `infra/lib/laser-queue-stack.ts`. A new frontend origin must be added to
+  `ALLOWED_ORIGINS` in the stack *and* as a SPA redirect URI in Entra.
+- Every handler must call `authorize()` from `backend/src/lib/auth.ts` first.
+  The JWT authorizer only proves the token is valid; the handler checks the
+  scope, guest status and `Staff` role. Never trust identity from the body.
+- HTTP API JWT authorizers flatten array claims (`roles`) into strings like
+  `"[Staff]"`. Use `listClaim()` in `lib/auth.ts`.
 
 ## Checks
 
