@@ -7,15 +7,23 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as scheduler from "aws-cdk-lib/aws-scheduler";
+import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import type { Construct } from "constructs";
 
-const HANDLERS_DIR = path.join(
-  import.meta.dirname,
-  "../../backend/src/handlers",
-);
+const BACKEND_SRC = path.join(import.meta.dirname, "../../backend/src");
+const HANDLERS_DIR = path.join(BACKEND_SRC, "handlers");
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 const URL_EXPIRY_SECONDS = 300;
+
+// The weekly cleanup (backend/src/scheduled/cleanup.ts) clears completed jobs
+// and expires queued jobs older than this. Mirrored in web/src/api.ts.
+const QUEUED_JOB_MAX_AGE_DAYS = 14;
+// Backstop for files the cleanup never reaches (an upload whose record is
+// gone, or a cleanup that kept failing). Longer than any job can legitimately
+// wait: at most QUEUED_JOB_MAX_AGE_DAYS plus a week until the next cleanup.
+const FILE_MAX_AGE_DAYS = 30;
 
 // The Entra ID app registration "Innovation Center Queue" in the University of
 // Kentucky tenant. Neither value is a secret. Mirrored in web/src/auth.ts.
@@ -38,6 +46,13 @@ export class LaserQueueStack extends cdk.Stack {
       encryption: s3.BucketEncryption.S3_MANAGED,
       enforceSSL: true,
       // The browser uploads to and downloads from S3 directly via presigned URLs.
+      lifecycleRules: [
+        {
+          id: "ExpireOldJobFiles",
+          prefix: "jobs/",
+          expiration: cdk.Duration.days(FILE_MAX_AGE_DAYS),
+        },
+      ],
       cors: [
         {
           allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.GET],
@@ -60,19 +75,23 @@ export class LaserQueueStack extends cdk.Stack {
         : {}),
     });
 
-    const handler = (id: string, file: string) =>
+    const fn = (id: string, entry: string, timeout = cdk.Duration.seconds(10)) =>
       new NodejsFunction(this, id, {
-        entry: path.join(HANDLERS_DIR, file),
+        entry,
         runtime: lambda.Runtime.NODEJS_24_X,
         architecture: lambda.Architecture.ARM_64,
-        timeout: cdk.Duration.seconds(10),
+        timeout,
         environment: {
           TABLE_NAME: table.tableName,
           BUCKET_NAME: bucket.bucketName,
           MAX_FILE_SIZE_BYTES: String(MAX_FILE_SIZE_BYTES),
           URL_EXPIRY_SECONDS: String(URL_EXPIRY_SECONDS),
+          QUEUED_JOB_MAX_AGE_DAYS: String(QUEUED_JOB_MAX_AGE_DAYS),
         },
       });
+    // An API route's Lambda.
+    const handler = (id: string, file: string) =>
+      fn(id, path.join(HANDLERS_DIR, file));
 
     const createJob = handler("CreateJob", "createJob.ts");
     // Read as well as write: it counts the queue to tell the student their place.
@@ -81,6 +100,10 @@ export class LaserQueueStack extends cdk.Stack {
 
     const listJobs = handler("ListJobs", "listJobs.ts");
     table.grantReadData(listJobs);
+
+    // Staff analytics: reads timestamps only, across every job ever submitted.
+    const getAnalytics = handler("GetAnalytics", "getAnalytics.ts");
+    table.grantReadData(getAnalytics);
 
     const getQueueLength = handler("GetQueueLength", "getQueueLength.ts");
     table.grantReadData(getQueueLength);
@@ -93,8 +116,30 @@ export class LaserQueueStack extends cdk.Stack {
     table.grantWriteData(completeJob);
 
     const deleteJob = handler("DeleteJob", "deleteJob.ts");
+    // Read and write: deleting archives the record rather than removing it.
     table.grantReadWriteData(deleteJob);
     bucket.grantDelete(deleteJob);
+
+    // Weekly cleanup, Sundays at 3 AM in the lab's time zone. Archives jobs
+    // exactly like DELETE /jobs/{jobId}, so it needs the same access.
+    const cleanup = fn(
+      "WeeklyCleanup",
+      path.join(BACKEND_SRC, "scheduled/cleanup.ts"),
+      cdk.Duration.minutes(5),
+    );
+    table.grantReadWriteData(cleanup);
+    bucket.grantDelete(cleanup);
+    new scheduler.Schedule(this, "WeeklyCleanupSchedule", {
+      description:
+        "Clears completed jobs and expires stale queued jobs, keeping anonymous records for analytics.",
+      schedule: scheduler.ScheduleExpression.cron({
+        weekDay: "SUN",
+        hour: "3",
+        minute: "0",
+        timeZone: cdk.TimeZone.AMERICA_NEW_YORK,
+      }),
+      target: new LambdaInvoke(cleanup, { retryAttempts: 2 }),
+    });
 
     // Every route requires an Entra access token issued by the UK tenant for
     // this app. Handlers then check scope, guest status and the Staff role
@@ -134,6 +179,14 @@ export class LaserQueueStack extends cdk.Stack {
       integration: new HttpLambdaIntegration(
         "GetQueueLengthIntegration",
         getQueueLength,
+      ),
+    });
+    api.addRoutes({
+      path: "/analytics",
+      methods: [apigwv2.HttpMethod.GET],
+      integration: new HttpLambdaIntegration(
+        "GetAnalyticsIntegration",
+        getAnalytics,
       ),
     });
     api.addRoutes({

@@ -11,7 +11,7 @@ New to the project? Read this file for setup, then
 ## Repository layout
 
 ```
-web/        React + TypeScript + Vite frontend (/submit, /queue)
+web/        React + TypeScript + Vite frontend (/submit, /queue, /analytics)
 backend/    Lambda handlers (one file per API route)
 infra/      AWS CDK stack: S3, DynamoDB, Lambda, HTTP API
 ```
@@ -29,6 +29,7 @@ installs everything.
 | `GET /jobs/{jobId}/download` | Staff           | `backend/src/handlers/getDownloadUrl.ts` |
 | `POST /jobs/{jobId}/complete`| Staff           | `backend/src/handlers/completeJob.ts`    |
 | `DELETE /jobs/{jobId}`       | Staff           | `backend/src/handlers/deleteJob.ts`      |
+| `GET /analytics`             | Staff           | `backend/src/handlers/getAnalytics.ts`   |
 
 Every route needs a Microsoft Entra ID access token in an
 `Authorization: Bearer` header. See "Authentication" in
@@ -56,8 +57,8 @@ npm run dev
 ```
 
 Local frontends point at the shared development backend rather than emulating
-AWS locally. Sign in with your UK account. To see `/queue` you need the `Staff`
-app role (see [Sign-in](#sign-in-microsoft-entra-id)). Run the dev server on
+AWS locally. Sign in with your UK account. To see `/queue` and `/analytics`
+you need the `Staff` app role (see [Sign-in](#sign-in-microsoft-entra-id)). Run the dev server on
 the default port 5173: it's the only local address registered for sign-in.
 
 ### Deploy the backend
@@ -142,3 +143,8 @@ rewrite so client-side routes load `index.html`.
   `npm run strip-student-ids -- --stage <dev|prod> --profile <aws-profile>`.
 - Students can see how many jobs are waiting (`GET /queue/length`) and their
   own place in line, but never other students' names or files.
+- Deleting a job removes its file, the student's name and the file name. Only
+  its timestamps are kept, so `/analytics` can still count it.
+- Every Sunday at 3 AM Eastern a cleanup does the same to completed jobs staff
+  didn't delete and to queued jobs older than 14 days. S3 also deletes any
+  uploaded file older than 30 days, as a backstop.

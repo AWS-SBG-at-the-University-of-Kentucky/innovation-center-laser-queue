@@ -10,7 +10,7 @@ import { authorize } from "../lib/auth.js";
 import { ddb, s3 } from "../lib/aws.js";
 import { config } from "../lib/config.js";
 import { error, json } from "../lib/http.js";
-import type { Job } from "../types.js";
+import type { JobRecord } from "../types.js";
 
 // GET /jobs/{jobId}/download (staff only)
 export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
@@ -23,8 +23,9 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) 
   const { Item } = await ddb.send(
     new GetCommand({ TableName: config.tableName, Key: { jobId } }),
   );
-  if (!Item) return error(404, "Job not found.");
-  const job = Item as Job;
+  const job = Item as JobRecord | undefined;
+  // Deleted jobs keep an archived record, but no file.
+  if (!job || job.status === "ARCHIVED") return error(404, "Job not found.");
 
   // The job record is written before the browser uploads, so the file can be
   // missing if that upload never finished.

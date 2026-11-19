@@ -1,6 +1,8 @@
-import { ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
+import { DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import type { Job, JobSummary } from "../types.js";
-import { ddb } from "./aws.js";
+import { ddb, s3 } from "./aws.js";
 import { config } from "./config.js";
 
 /**
@@ -48,4 +50,44 @@ export async function countQueued(upTo?: string): Promise<number> {
     startKey = page.LastEvaluatedKey;
   } while (startKey);
   return count;
+}
+
+/**
+ * Deletes a job's file and strips the student's name and file name, leaving
+ * an ArchivedJob with only its timestamps for analytics. Used when staff
+ * delete a job and by the weekly cleanup.
+ *
+ * Only archives the job if its status is still `job.status`. Returns false if
+ * it had changed (for example, another request already archived it).
+ */
+export async function archiveJob(job: Job): Promise<boolean> {
+  // File first: if this fails the record still points at the file, so it can
+  // be retried instead of leaving an orphaned file behind.
+  await s3.send(
+    new DeleteObjectCommand({ Bucket: config.bucketName, Key: job.s3Key }),
+  );
+
+  try {
+    await ddb.send(
+      new UpdateCommand({
+        TableName: config.tableName,
+        Key: { jobId: job.jobId },
+        // Also removes studentEmail/studentId left on old records.
+        UpdateExpression:
+          "SET #status = :archived, archivedAt = :now " +
+          "REMOVE studentName, originalFileName, s3Key, fileExtension, studentEmail, studentId",
+        ConditionExpression: "#status = :expected",
+        ExpressionAttributeNames: { "#status": "status" },
+        ExpressionAttributeValues: {
+          ":archived": "ARCHIVED",
+          ":expected": job.status,
+          ":now": new Date().toISOString(),
+        },
+      }),
+    );
+    return true;
+  } catch (err) {
+    if (err instanceof ConditionalCheckFailedException) return false;
+    throw err;
+  }
 }

@@ -18,4 +18,7 @@ export const config = {
   get urlExpirySeconds() {
     return Number(required("URL_EXPIRY_SECONDS"));
   },
+  get queuedJobMaxAgeDays() {
+    return Number(required("QUEUED_JOB_MAX_AGE_DAYS"));
+  },
 };

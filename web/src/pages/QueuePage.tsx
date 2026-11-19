@@ -4,6 +4,7 @@ import {
   completeJob,
   deleteJob,
   getDownloadUrl,
+  QUEUED_JOB_MAX_AGE_DAYS,
   listJobs,
 } from "../api";
 import { PresenceNotice } from "../components/PresenceNotice";
@@ -319,6 +320,7 @@ export function QueuePage() {
             {queued
               ? `${queued.length} ${queued.length === 1 ? "job" : "jobs"}, oldest first`
               : "Oldest first"}
+            {` · cleared after ${QUEUED_JOB_MAX_AGE_DAYS} days`}
           </span>
         </div>
         <button
@@ -376,7 +378,7 @@ export function QueuePage() {
             <h2>Completed</h2>
             <span>
               {completed.length} {completed.length === 1 ? "job" : "jobs"},
-              most recent first
+              most recent first · cleared every Sunday
             </span>
           </header>
           <JobTable

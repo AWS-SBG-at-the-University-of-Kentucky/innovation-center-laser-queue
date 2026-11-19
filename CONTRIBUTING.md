@@ -33,6 +33,9 @@ git-ignored.
 | Input rules (lengths, file types) | `backend/src/lib/validation.ts`          |
 | The job record's fields          | `backend/src/types.ts` (and its copy in `web/src/api.ts`) |
 | AWS resources, limits, permissions | `infra/lib/laser-queue-stack.ts`        |
+| Analytics figures                | `backend/src/lib/analytics.ts` (daily counts), `web/src/analytics.ts` (weeks, months, records) |
+| Top-bar links for staff          | `web/src/components/StaffNav.tsx`        |
+| The weekly cleanup               | `backend/src/scheduled/cleanup.ts`; schedule and file backstop in the stack |
 
 ## Common changes
 
@@ -62,6 +65,15 @@ git-ignored.
    take it from the token (`authorize()` in `lib/auth.ts`) instead.
 4. Existing records won't have the field, so make it optional or handle it
    being missing.
+
+### Change the weekly cleanup
+
+The schedule (`WeeklyCleanupSchedule`), how long a job may wait
+(`QUEUED_JOB_MAX_AGE_DAYS`) and the S3 backstop (`FILE_MAX_AGE_DAYS`) are in
+`infra/lib/laser-queue-stack.ts`. Keep `FILE_MAX_AGE_DAYS` longer than
+`QUEUED_JOB_MAX_AGE_DAYS` plus a week, or S3 may delete files of jobs still
+waiting. Update the copy of `QUEUED_JOB_MAX_AGE_DAYS` in `web/src/api.ts`,
+and the "every Sunday" text on the queue page if the day changes.
 
 ### Allow another file type
 

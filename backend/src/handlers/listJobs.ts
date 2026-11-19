@@ -18,6 +18,10 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) 
     const page = await ddb.send(
       new ScanCommand({
         TableName: config.tableName,
+        // Deleted jobs stay in the table for analytics; the queue skips them.
+        FilterExpression: "#status <> :archived",
+        ExpressionAttributeNames: { "#status": "status" },
+        ExpressionAttributeValues: { ":archived": "ARCHIVED" },
         ExclusiveStartKey: startKey,
       }),
     );

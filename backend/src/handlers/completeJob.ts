@@ -25,11 +25,13 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) 
         // if_not_exists keeps the original time if the job is completed twice.
         UpdateExpression:
           "SET #status = :completed, completedAt = if_not_exists(completedAt, :now)",
-        // Without this, updating an unknown ID would create a new item.
-        ConditionExpression: "attribute_exists(jobId)",
+        // Without the first check, updating an unknown ID would create a new
+        // item. Deleted (archived) jobs can't be completed again.
+        ConditionExpression: "attribute_exists(jobId) AND #status <> :archived",
         ExpressionAttributeNames: { "#status": "status" },
         ExpressionAttributeValues: {
           ":completed": "COMPLETED",
+          ":archived": "ARCHIVED",
           ":now": new Date().toISOString(),
         },
         ReturnValues: "ALL_NEW",

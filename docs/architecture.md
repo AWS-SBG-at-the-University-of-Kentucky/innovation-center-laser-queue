@@ -22,15 +22,19 @@ flowchart LR
   Browser -- "file upload / download<br/>(presigned URL)" --> S3
 ```
 
-There are two pages:
+There are three pages:
 
 - **`/submit`** (`web/src/pages/SubmitPage.tsx`): signed-in students upload an
   `.ai` file. Their name comes from their UK account. The page shows how
   many jobs are in line and, after submitting, the student's place in line.
 - **`/queue`** (`web/src/pages/QueuePage.tsx`): staff on the lab PC see every
   job, download files, mark jobs completed, and delete completed jobs.
+- **`/analytics`** (`web/src/pages/AnalyticsPage.tsx`): staff see how much the
+  laser gets used: totals, records, a calendar heat map and talking points.
 
-Both pages are behind sign-in (`web/src/components/AuthGate.tsx`).
+All pages are behind sign-in (`web/src/components/AuthGate.tsx`). Staff get
+links to all three in the top bar (`StaffNav.tsx`); students only have
+`/submit`, so they get no links.
 
 All AWS resources are defined in one CDK stack,
 `infra/lib/laser-queue-stack.ts`. It is deployed twice, as `LaserQueue-dev` and
@@ -59,11 +63,36 @@ sequenceDiagram
   API->>DB: status COMPLETED, set completedAt
   T->>API: DELETE /jobs/{id}
   API->>B: delete file
-  API->>DB: delete job
+  API->>DB: status ARCHIVED, remove name and file name
 ```
 
-A job is either `QUEUED` or `COMPLETED`. Only completed jobs can be deleted,
-and deleting removes both the record and the file.
+A job is `QUEUED`, then `COMPLETED`, then `ARCHIVED` once staff delete it.
+Only completed jobs can be deleted. Deleting removes the file, the student's
+name and the file name, but keeps the record's timestamps so analytics can
+still count the job. Archived jobs never appear in `GET /jobs` and can't be
+downloaded or completed again.
+
+## Weekly cleanup
+
+`backend/src/scheduled/cleanup.ts` runs every Sunday at 3 AM Eastern
+(EventBridge Scheduler, `WeeklyCleanupSchedule` in the stack). It archives
+jobs exactly as the delete button does (`archiveJob()` in `lib/jobs.ts`):
+
+- every `COMPLETED` job staff didn't delete, and
+- every `QUEUED` job older than `QUEUED_JOB_MAX_AGE_DAYS` (14). These are
+  treated as abandoned: the student left, or the upload never finished. They
+  are archived without a `completedAt`, so analytics counts them as expired,
+  not cut.
+
+It isn't an API route, so it doesn't call `authorize()`: only the scheduler
+can invoke it. If any job fails, the run fails and the scheduler retries it
+(up to twice); archived jobs are skipped, so a retry only picks up what's
+left. Its logs are in CloudWatch under the `WeeklyCleanup` function.
+
+As a backstop, an S3 lifecycle rule deletes any file under `jobs/` older than
+`FILE_MAX_AGE_DAYS` (30). No job can legitimately keep its file that long (14
+days queued plus up to a week until the next cleanup), so the rule only
+catches files the cleanup missed.
 
 ## Authentication
 
@@ -140,6 +169,9 @@ That file is the source of truth for its fields.
   `jobs/{jobId}/{sanitized file name}`.
 - **API responses** use `JobSummary`, which is the job without `s3Key`. Bucket
   paths never leave the backend.
+- **Archived jobs** (`ArchivedJob`) share the table. Anything that scans it
+  must decide whether to skip them, as `GET /jobs` does. An archived job with
+  no `completedAt` expired in the queue without being cut.
 
 `web/src/api.ts` keeps its own copy of these types, because the frontend
 doesn't import from `backend/`. If you change one, change the other.
@@ -160,12 +192,24 @@ only to show a friendlier error.
 the tab mid-upload, a `QUEUED` job with no file is left behind. `getDownloadUrl`
 checks for the file first and returns a clear 404 when it's missing.
 
-**Delete removes the file first, then the record.** If the S3 delete fails, the
-record is still there and staff can retry. Doing it the other way round could
-leave files in S3 that nothing points to.
+**Delete removes the file first, then archives the record.** If the S3 delete
+fails, the record is still there and staff can retry. Doing it the other way
+round could leave files in S3 that nothing points to.
 
-**`GET /jobs` scans the whole table**, and so do `GET /queue/length` and
-`createJob` (to count the queue). That's fine at lab scale (hundreds of
+**Deleted jobs are archived, not removed.** Analytics needs every job ever cut,
+and staff delete completed jobs to tidy the queue. Archiving keeps only the
+timestamps, so nothing personal outlives the delete.
+
+**Analytics are counted on the server, in the lab's time zone.**
+`GET /analytics` (`backend/src/lib/analytics.ts`) rolls jobs up into counts
+per day in `America/New_York`, so a job cut at 10 PM lands on the right day
+whatever time zone the viewer is in, and the response stays small as history
+grows. The page (`web/src/analytics.ts`) works out weeks, months and records
+from those daily counts. A "cut" is a job marked completed, counted on the day
+it was completed.
+
+**`GET /jobs` scans the whole table**, and so do `GET /queue/length`,
+`GET /analytics`, the weekly cleanup and `createJob` (to count the queue). That's fine at lab scale (hundreds of
 jobs). If the table ever grows large, add a secondary index on `status` or
 `createdAt` and query that instead.
 
@@ -201,5 +245,8 @@ point-in-time recovery. Dev has neither, so it can be torn down freely.
 - **No automated tests for the app itself.** CI type-checks every workspace,
   builds the frontend and synthesizes the CDK stack. Only `scripts/deploy.mjs`
   has tests.
+- **Analytics only go back to this feature's release.** Before it, deleting a
+  job removed its record, so jobs deleted earlier aren't counted. Jobs that
+  were still in the table then are.
 - **The queue page doesn't update on its own.** Staff press Refresh to see new
   submissions.
