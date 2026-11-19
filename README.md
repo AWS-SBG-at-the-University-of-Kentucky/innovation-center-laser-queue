@@ -11,7 +11,7 @@ New to the project? Read this file for setup, then
 ## Repository layout
 
 ```
-web/        React + TypeScript + Vite frontend (/submit, /queue, /analytics)
+web/        React + TypeScript + Vite frontend (/submit, /queue, /analytics, /stations)
 backend/    Lambda handlers (one file per API route)
 infra/      AWS CDK stack: S3, DynamoDB, Lambda, HTTP API
 ```
@@ -30,10 +30,19 @@ installs everything.
 | `POST /jobs/{jobId}/complete`| Staff           | `backend/src/handlers/completeJob.ts`    |
 | `DELETE /jobs/{jobId}`       | Staff           | `backend/src/handlers/deleteJob.ts`      |
 | `GET /analytics`             | Staff           | `backend/src/handlers/getAnalytics.ts`   |
+| `GET /stations`              | Staff           | `backend/src/handlers/listStations.ts`   |
+| `POST /stations`             | Staff           | `backend/src/handlers/createStation.ts`  |
+| `DELETE /stations/{stationId}` | Staff         | `backend/src/handlers/deleteStation.ts`  |
+| `GET /station/jobs`          | Lab stations    | `backend/src/handlers/listJobs.ts`       |
+| `GET /station/jobs/{jobId}/download` | Lab stations | `backend/src/handlers/getDownloadUrl.ts` |
+| `POST /station/jobs/{jobId}/complete` | Lab stations | `backend/src/handlers/completeJob.ts` |
+| `DELETE /station/jobs/{jobId}` | Lab stations  | `backend/src/handlers/deleteJob.ts`      |
 
-Every route needs a Microsoft Entra ID access token in an
+Every route except `/station/*` needs a Microsoft Entra ID access token in an
 `Authorization: Bearer` header. See "Authentication" in
-[docs/architecture.md](docs/architecture.md#authentication).
+[docs/architecture.md](docs/architecture.md#authentication). The
+`/station/*` routes are signed by a registered lab PC instead; see
+[Lab stations](docs/architecture.md#lab-stations).
 
 Files never pass through Lambda: the browser uploads to and downloads from S3
 directly using short-lived presigned URLs.
@@ -115,9 +124,11 @@ University of Kentucky tenant. Its tenant and client IDs are in
 - **Giving someone staff access:** Entra admin center → Enterprise
   applications → Innovation Center Queue → Users and groups → Add
   user/group, role `Staff`. They must sign out and back in afterwards.
-- **Lab PC:** sign in with "Keep this computer signed in" ticked and answer
-  **Yes** to Microsoft's "Stay signed in?". Don't tick it on shared or public
-  computers.
+- **Lab PC:** don't leave anyone signed in on it. Register it as a lab
+  station instead. On the lab PC, make the desktop shortcut shown on the
+  **Stations** page and open it. Sign in, open **Stations** and click
+  **Register this PC**, then sign out. The shortcut then opens the queue with
+  nobody signed in. Answer **No** if Microsoft asks "Stay signed in?".
 - **Adding a new frontend URL** (for example an Amplify preview branch): add
   it as a *Single-page application* redirect URI on the app registration
   (Authentication), **and** to `ALLOWED_ORIGINS` in
@@ -136,7 +147,9 @@ rewrite so client-side routes load `index.html`.
 - Never commit AWS credentials or `.env` files.
 - Every API route requires a UK Entra ID sign-in. Guest accounts are
   rejected, and only users with the `Staff` app role can view, download,
-  complete or delete jobs.
+  complete or delete jobs. The one exception is a registered lab station,
+  which can use the queue (and nothing else) with a key that can't be copied
+  off the PC. Staff can remove a station at any time.
 - The student's name is taken from their sign-in, not typed in. It is the
   only personal detail stored: emails and Entra IDs are not saved. Jobs from
   before that change can be cleaned up with

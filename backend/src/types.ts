@@ -76,3 +76,37 @@ export interface Analytics {
     last30Days: number | null;
   };
 }
+
+// Lab stations. Mirrored in web/src/api.ts.
+
+/**
+ * A lab station's ECDSA P-256 public key, as a JWK. The matching private key
+ * was created in the station's browser as non-extractable and never leaves it.
+ */
+export interface StationPublicKey {
+  kty: "EC";
+  crv: "P-256";
+  x: string;
+  y: string;
+}
+
+/**
+ * One item in the LabStations table: a PC (the lab PC) allowed to use the
+ * queue without anyone signed in. See "Lab stations" in docs/architecture.md.
+ */
+export interface Station {
+  stationId: string;
+  name: string;
+  publicKey: StationPublicKey;
+  /** UTC ISO-8601 timestamp. */
+  createdAt: string;
+  /** Display name of the staff member who registered it. */
+  createdBy: string;
+  /** UTC ISO-8601 timestamp, updated at most every few minutes. */
+  lastUsedAt?: string;
+  /** IP address the station last called the API from. */
+  lastUsedIp?: string;
+}
+
+/** What the API returns for a station; the public key stays server-side. */
+export type StationSummary = Omit<Station, "publicKey">;

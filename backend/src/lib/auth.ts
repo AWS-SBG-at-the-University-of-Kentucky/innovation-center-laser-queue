@@ -1,18 +1,35 @@
 import type {
   APIGatewayProxyEventV2WithJWTAuthorizer,
+  APIGatewayProxyEventV2WithLambdaAuthorizer,
+  APIGatewayProxyResultV2,
   APIGatewayProxyStructuredResultV2,
+  Handler,
 } from "aws-lambda";
+import type { StationContext } from "../authorizers/station.js";
 import { error } from "./http.js";
 
 // API Gateway's JWT authorizer has already checked the token's signature,
 // expiry, issuer (our Entra tenant) and audience (our app registration) before
 // a handler runs. This file checks the claims that decide what the caller may
 // do. See "Authentication" in docs/architecture.md.
+//
+// The /station/* routes use the station authorizer (authorizers/station.ts)
+// instead, which has already checked the lab station's signature. Those
+// requests carry the station's ID rather than token claims, and are only
+// accepted by handlers that pass `allowStation`. See "Lab stations".
 
 /** The delegated scope the frontend requests; see "Expose an API" in Entra. */
 const API_SCOPE = "access_as_user";
 /** App role assigned to lab staff in Entra (Enterprise applications). */
 const STAFF_ROLE = "Staff";
+
+/** A request from a signed-in user, or from a lab station. */
+export type ApiEvent =
+  | APIGatewayProxyEventV2WithJWTAuthorizer
+  | APIGatewayProxyEventV2WithLambdaAuthorizer<StationContext>;
+
+/** A handler that also serves a /station/* route. */
+export type ApiHandler = Handler<ApiEvent, APIGatewayProxyResultV2>;
 
 type Claims =
   APIGatewayProxyEventV2WithJWTAuthorizer["requestContext"]["authorizer"]["jwt"]["claims"];
@@ -27,9 +44,21 @@ export interface User {
   isStaff: boolean;
 }
 
-export type AuthResult =
-  | { ok: true; user: User }
-  | { ok: false; response: APIGatewayProxyStructuredResultV2 };
+/** A registered lab PC, using the queue without anyone signed in. */
+export interface LabStation {
+  stationId: string;
+  name: string;
+}
+
+type Denied = { ok: false; response: APIGatewayProxyStructuredResultV2 };
+
+export type AuthResult = { ok: true; user: User } | Denied;
+
+/** For staff routes that lab stations may also call. */
+export type StaffOrStationResult =
+  | { ok: true; user: User; station?: undefined }
+  | { ok: true; user?: undefined; station: LabStation }
+  | Denied;
 
 function stringClaim(claims: Claims, name: string): string | undefined {
   const value = claims[name];
@@ -54,7 +83,7 @@ function listClaim(claims: Claims, name: string): string[] {
     .filter(Boolean);
 }
 
-function deny(statusCode: number, message: string, reason: string): AuthResult {
+function deny(statusCode: number, message: string, reason: string): Denied {
   console.warn(`Auth denied (${statusCode}): ${reason}`);
   return { ok: false, response: error(statusCode, message) };
 }
@@ -62,12 +91,47 @@ function deny(statusCode: number, message: string, reason: string): AuthResult {
 /**
  * Identifies the caller and checks they may use this route. Every handler
  * calls this first and returns `response` when `ok` is false.
+ *
+ * Lab stations are rejected unless `allowStation` is set, which only staff
+ * routes may do: a station stands in for staff at the lab PC.
  */
 export function authorize(
-  event: APIGatewayProxyEventV2WithJWTAuthorizer,
-  { staffOnly }: { staffOnly: boolean },
-): AuthResult {
-  const claims = event.requestContext.authorizer?.jwt?.claims;
+  event: ApiEvent,
+  options: { staffOnly: boolean; allowStation?: false },
+): AuthResult;
+export function authorize(
+  event: ApiEvent,
+  options: { staffOnly: true; allowStation: true },
+): StaffOrStationResult;
+export function authorize(
+  event: ApiEvent,
+  {
+    staffOnly,
+    allowStation = false,
+  }: { staffOnly: boolean; allowStation?: boolean },
+): StaffOrStationResult {
+  const authorizer = event.requestContext.authorizer;
+  if (authorizer && "lambda" in authorizer) {
+    if (!allowStation) {
+      return deny(
+        403,
+        "Sign in with your UK account to do this.",
+        "station on a route that doesn't allow stations",
+      );
+    }
+    const { stationId, stationName } = authorizer.lambda ?? {};
+    if (!stationId) {
+      return deny(
+        401,
+        "This PC isn't a registered lab station.",
+        "no station ID",
+      );
+    }
+    return { ok: true, station: { stationId, name: stationName ?? "" } };
+  }
+
+  const claims =
+    authorizer && "jwt" in authorizer ? authorizer.jwt?.claims : undefined;
   if (!claims) {
     return deny(401, "Sign in to continue.", "no JWT claims on request");
   }

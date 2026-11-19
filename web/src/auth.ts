@@ -3,6 +3,7 @@ import {
   InteractionRequiredAuthError,
   PublicClientApplication,
 } from "@azure/msal-browser";
+import { type LocalStation, loadStation } from "./station";
 
 // The Entra ID app registration "Innovation Center Queue" in the University of
 // Kentucky tenant. Neither value is a secret. Mirrored in
@@ -25,42 +26,12 @@ const msal = new PublicClientApplication({
     redirectUri: window.location.origin,
     postLogoutRedirectUri: window.location.origin,
   },
-  // MSAL clears its token cache when the browser closes whatever the storage,
-  // so staying signed in relies on Microsoft's own cookie (see keepSignedIn).
+  // Tokens last only as long as the tab. The lab PC doesn't stay signed in:
+  // it's a lab station instead (station.ts).
   cache: { cacheLocation: "sessionStorage" },
 });
 
 const loginRequest = { scopes: [API_SCOPE] };
-
-/**
- * Set on computers where someone ticked "Keep this computer signed in" (the lab
- * PC). The site then signs in automatically on load. If the user chose "Stay
- * signed in" at Microsoft, that redirect comes straight back without asking
- * for a password, even after the browser restarts.
- */
-const KEEP_SIGNED_IN_KEY = "laserQueue.keepSignedIn";
-/** Per tab: stops automatic sign-in looping if it fails or is cancelled. */
-const AUTO_SIGN_IN_TRIED_KEY = "laserQueue.autoSignInTried";
-
-function readFlag(storage: () => Storage, key: string) {
-  try {
-    return storage().getItem(key) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function writeFlag(storage: () => Storage, key: string, on: boolean) {
-  try {
-    if (on) storage().setItem(key, "1");
-    else storage().removeItem(key);
-  } catch {
-    // Storage blocked (private mode): fall back to signing in each visit.
-  }
-}
-
-const local = () => window.localStorage;
-const session = () => window.sessionStorage;
 
 let ready: Promise<AccountInfo | null> | undefined;
 
@@ -73,38 +44,41 @@ export function initAuth(): Promise<AccountInfo | null> {
     await msal.initialize();
     const result = await msal.handleRedirectPromise();
     const account = result?.account ?? msal.getAllAccounts()[0] ?? null;
-    if (account) {
-      msal.setActiveAccount(account);
-      writeFlag(session, AUTO_SIGN_IN_TRIED_KEY, false);
-      return account;
-    }
-    if (
-      readFlag(local, KEEP_SIGNED_IN_KEY) &&
-      !readFlag(session, AUTO_SIGN_IN_TRIED_KEY)
-    ) {
-      writeFlag(session, AUTO_SIGN_IN_TRIED_KEY, true);
-      await msal.loginRedirect(loginRequest);
-      // The page is navigating to Microsoft; stay on the loading state.
-      return new Promise<never>(() => {});
-    }
-    return null;
+    if (account) msal.setActiveAccount(account);
+    return account;
   })();
   return ready;
 }
 
-/** Whether this computer is set to stay signed in. */
-export function keepsSignedIn() {
-  return readFlag(local, KEEP_SIGNED_IN_KEY);
+/**
+ * Who is using the site: someone signed in with their UK account, or, when
+ * nobody is, the lab station this PC is registered as.
+ */
+export type Session =
+  | { kind: "user"; account: AccountInfo }
+  | { kind: "station"; station: LocalStation };
+
+/** The current session, or null if the visitor has to sign in. */
+export async function initSession(): Promise<Session | null> {
+  const account = await initAuth();
+  if (account) return { kind: "user", account };
+  const station = await loadStation();
+  return station ? { kind: "station", station } : null;
 }
 
-export function signIn({ keepSignedIn }: { keepSignedIn: boolean }) {
-  writeFlag(local, KEEP_SIGNED_IN_KEY, keepSignedIn);
-  return msal.loginRedirect(loginRequest);
+/**
+ * `fresh` makes Microsoft ask for a password even if it remembers someone.
+ * Used on lab stations, where the last person may not have signed out.
+ */
+export function signIn({ fresh = false }: { fresh?: boolean } = {}) {
+  return msal.loginRedirect({
+    ...loginRequest,
+    ...(fresh ? { prompt: "login" } : {}),
+  });
 }
 
-/** Signs out of Microsoft too, and stops this computer staying signed in. */
+/** Signs out of Microsoft too, not just this site. */
 export function signOut() {
-  writeFlag(local, KEEP_SIGNED_IN_KEY, false);
   return msal.logoutRedirect({ account: msal.getActiveAccount() ?? undefined });
 }
 

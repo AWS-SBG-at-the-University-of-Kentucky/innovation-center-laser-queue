@@ -1,7 +1,6 @@
 import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import type { APIGatewayProxyHandlerV2WithJWTAuthorizer } from "aws-lambda";
-import { authorize } from "../lib/auth.js";
+import { type ApiHandler, authorize } from "../lib/auth.js";
 import { ddb } from "../lib/aws.js";
 import { config } from "../lib/config.js";
 import { error, json } from "../lib/http.js";
@@ -9,8 +8,9 @@ import { toSummary } from "../lib/jobs.js";
 import type { Job } from "../types.js";
 
 // POST /jobs/{jobId}/complete (staff only)
-export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
-  const auth = authorize(event, { staffOnly: true });
+// POST /station/jobs/{jobId}/complete (lab stations)
+export const handler: ApiHandler = async (event) => {
+  const auth = authorize(event, { staffOnly: true, allowStation: true });
   if (!auth.ok) return auth.response;
 
   const jobId = event.pathParameters?.jobId;

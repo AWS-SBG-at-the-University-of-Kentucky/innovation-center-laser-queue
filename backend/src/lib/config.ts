@@ -9,6 +9,9 @@ export const config = {
   get tableName() {
     return required("TABLE_NAME");
   },
+  get stationsTableName() {
+    return required("STATIONS_TABLE_NAME");
+  },
   get bucketName() {
     return required("BUCKET_NAME");
   },

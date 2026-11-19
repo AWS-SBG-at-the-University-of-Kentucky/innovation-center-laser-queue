@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { Link, Navigate, Route, Routes } from "react-router-dom";
 import { isStaff } from "./auth";
-import { AuthGate, useAccount } from "./components/AuthGate";
+import { AuthGate, useAccount, useSession } from "./components/AuthGate";
 import { InboxIcon } from "./icons";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { QueuePage } from "./pages/QueuePage";
+import { StationsPage } from "./pages/StationsPage";
 import { SubmitPage } from "./pages/SubmitPage";
 
 /**
@@ -31,29 +32,56 @@ function StaffOnly({ children }: { children: ReactNode }) {
   );
 }
 
+function AppRoutes() {
+  const session = useSession();
+
+  // A lab station with nobody signed in only gets the queue. The API also
+  // only lets stations reach the queue routes.
+  if (session.kind === "station") {
+    return (
+      <Routes>
+        <Route path="/queue" element={<QueuePage />} />
+        <Route path="*" element={<Navigate to="/queue" replace />} />
+      </Routes>
+    );
+  }
+
+  return (
+    <Routes>
+      <Route path="/submit" element={<SubmitPage />} />
+      <Route
+        path="/queue"
+        element={
+          <StaffOnly>
+            <QueuePage />
+          </StaffOnly>
+        }
+      />
+      <Route
+        path="/analytics"
+        element={
+          <StaffOnly>
+            <AnalyticsPage />
+          </StaffOnly>
+        }
+      />
+      <Route
+        path="/stations"
+        element={
+          <StaffOnly>
+            <StationsPage />
+          </StaffOnly>
+        }
+      />
+      <Route path="*" element={<Navigate to="/submit" replace />} />
+    </Routes>
+  );
+}
+
 export function App() {
   return (
     <AuthGate>
-      <Routes>
-        <Route path="/submit" element={<SubmitPage />} />
-        <Route
-          path="/queue"
-          element={
-            <StaffOnly>
-              <QueuePage />
-            </StaffOnly>
-          }
-        />
-        <Route
-          path="/analytics"
-          element={
-            <StaffOnly>
-              <AnalyticsPage />
-            </StaffOnly>
-          }
-        />
-        <Route path="*" element={<Navigate to="/submit" replace />} />
-      </Routes>
+      <AppRoutes />
     </AuthGate>
   );
 }

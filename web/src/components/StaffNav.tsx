@@ -4,6 +4,7 @@ const PAGES = [
   { to: "/submit", label: "Submit" },
   { to: "/queue", label: "Queue" },
   { to: "/analytics", label: "Analytics" },
+  { to: "/stations", label: "Stations" },
 ];
 
 /** Page links in the top bar. Only rendered for staff (see AuthGate). */
