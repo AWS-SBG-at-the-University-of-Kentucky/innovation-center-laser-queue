@@ -89,7 +89,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return (
       <SessionContext.Provider value={state.session}>
         <header className="user-bar">
-          <h1 className="app-title">Innovation Center Laser Queue</h1>
+          <h1 className="app-title">IC Laser Queue</h1>
           <div className="user-info">
             <span className="truncate">
               <span className="signed-in-label">Lab station </span>
@@ -119,7 +119,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       <SessionContext.Provider value={state.session}>
         <header className="user-bar">
           {/* The h1 for every signed-in page; pages start at h2. */}
-          <h1 className="app-title">Innovation Center Laser Queue</h1>
+          <h1 className="app-title">IC Laser Queue</h1>
           {/* Students only have the submit page, so they get no nav. */}
           {isStaff(account) && <StaffNav />}
           <div className="user-info">
