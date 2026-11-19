@@ -22,7 +22,7 @@ flowchart LR
   Browser -- "file upload / download<br/>(presigned URL)" --> S3
 ```
 
-There are three pages:
+There are four pages:
 
 - **`/submit`** (`web/src/pages/SubmitPage.tsx`): signed-in students upload an
   `.ai` file. Their name comes from their UK account. The page shows how
@@ -31,10 +31,13 @@ There are three pages:
   job, download files, mark jobs completed, and delete completed jobs.
 - **`/analytics`** (`web/src/pages/AnalyticsPage.tsx`): staff see how much the
   laser gets used: totals, records, a calendar heat map and talking points.
+- **`/stations`** (`web/src/pages/StationsPage.tsx`): staff register the lab PC
+  as a lab station and remove stations (see [Lab stations](#lab-stations)).
 
-All pages are behind sign-in (`web/src/components/AuthGate.tsx`). Staff get
-links to all three in the top bar (`StaffNav.tsx`); students only have
-`/submit`, so they get no links.
+All pages are behind sign-in (`web/src/components/AuthGate.tsx`), except that
+a registered lab station with nobody signed in gets `/queue`. Staff get links
+to all four in the top bar (`StaffNav.tsx`); students only have `/submit`, so
+they get no links.
 
 All AWS resources are defined in one CDK stack,
 `infra/lib/laser-queue-stack.ts`. It is deployed twice, as `LaserQueue-dev` and
@@ -130,15 +133,11 @@ Checks happen in two layers:
 The frontend (`web/src/auth.ts`) uses `@azure/msal-browser` with redirect
 sign-in. MSAL clears its own token cache when the browser closes.
 
-**Staying signed in (lab PC).** The sign-in page has a "Keep this computer
-signed in" checkbox. It sets a `localStorage` flag that makes the site sign in
-automatically on every load. If the user also chose "Stay signed in" at
-Microsoft, Microsoft's persistent cookie lets that redirect come straight back
-without a password, so a browser restart needs no clicks at all. Signing out
-clears both. How long Microsoft's cookie lasts is set by UK IT's policies,
-not by this app. `request()` in `web/src/api.ts` attaches a fresh access
-token to every call. The queue page hides itself from non-staff, but that's
-only for a friendlier message: the API enforces the role either way.
+Nobody stays signed in: MSAL keeps tokens in `sessionStorage`, so they go
+when the tab closes. The lab PC uses a [lab station](#lab-stations) instead.
+`request()` in `web/src/api.ts` attaches a fresh access token to every call.
+The queue page hides itself from non-staff, but that's only for a friendlier
+message: the API enforces the role either way.
 
 `createJob` takes the student's name from the token, not from the request
 body, so nobody can submit a job under someone else's name. The name is the
@@ -158,13 +157,73 @@ Entra settings this depends on (app registration unless noted):
 - **Token configuration:** optional claims `acct` and `email` on the access
   token. Without `acct`, every request is rejected (it fails closed).
 
+## Lab stations
+
+The lab PC needs the queue open all day, but leaving a staff member's UK
+account signed in on it would also leave their email, OneDrive and every
+other UK site open to whoever sits down. So the PC is registered as a **lab
+station** instead: it holds a key that only works for this queue, and nobody
+is signed in.
+
+```mermaid
+sequenceDiagram
+  participant P as Lab PC browser
+  participant API as API Gateway
+  participant A as Station authorizer
+  participant L as Queue Lambdas
+
+  Note over P: Staff signs in, opens /stations, "Register this PC"
+  P->>P: generate ECDSA P-256 key pair (private key non-extractable)
+  P->>API: POST /stations {name, publicKey} + Entra token
+  Note over P: Staff signs out. The key stays in IndexedDB.
+  P->>API: GET /station/jobs + x-station-id, -time, -signature
+  API->>A: headers
+  A->>A: look up public key, check signature and timestamp
+  A-->>API: allow, context {stationId}
+  API->>L: request (authorize() with allowStation)
+```
+
+- **The key can't be copied off the PC.** The browser creates the private key
+  with `extractable: false` and stores the `CryptoKey` object in IndexedDB
+  (`web/src/station.ts`). Scripts, including devtools, can ask the browser to
+  sign with it but can't read it. Only the public key is sent to the API.
+- **Every request is signed.** The signature covers the method, path, a
+  timestamp and the station ID (`signedMessage()` in
+  `backend/src/lib/stations.ts`, mirrored in `web/src/station.ts`). The
+  authorizer rejects timestamps more than 5 minutes off, so the PC's clock
+  must be right.
+- **Stations can only use the queue.** They call the same Lambdas as staff,
+  under `/station/*` routes that use the station authorizer
+  (`backend/src/authorizers/station.ts`) instead of the Entra one. Handlers
+  only accept a station if they pass `allowStation` to `authorize()`, which
+  only the four queue handlers do. A station can't submit jobs, see
+  analytics, or manage stations.
+- **Removing a station works immediately.** The authorizer doesn't cache its
+  results, so the station's next request fails.
+- **Staff see when each station was last used and from which IP**, so a key
+  used from somewhere unexpected stands out. The authorizer updates this at
+  most every 5 minutes.
+- **Stations are kept in their own table** (`LabStations`), so nothing that
+  scans jobs sees them. At most `MAX_STATIONS` (20) can be registered.
+
+On a station, the top bar shows the station's name and a **Staff sign in**
+button, which always asks for a password (`prompt=login`) in case Microsoft
+still remembers the last person. While someone is signed in on a station PC, a
+banner reminds them to sign out. After they do, the PC goes back to being the
+station.
+
+The browser may clear IndexedDB if the disk fills up (`saveStation()` asks it
+not to). Clearing site data for the app also deletes the key. Either way, a
+staff member registers the PC again and removes the old entry.
+
 ## Data model
 
 The job record is defined in [`backend/src/types.ts`](../backend/src/types.ts).
 That file is the source of truth for its fields.
 
-- **DynamoDB**: one table, partition key `jobId` (a UUID), no secondary
-  indexes.
+- **DynamoDB**: `LaserJobs`, partition key `jobId` (a UUID), no secondary
+  indexes. Lab stations are in a separate `LabStations` table, partition key
+  `stationId` (`Station` in `types.ts`).
 - **S3**: one private bucket. Each file is stored at
   `jobs/{jobId}/{sanitized file name}`.
 - **API responses** use `JobSummary`, which is the job without `s3Key`. Bucket

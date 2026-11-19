@@ -6,23 +6,36 @@ import {
   useEffect,
   useState,
 } from "react";
-import { initAuth, isStaff, keepsSignedIn, signIn, signOut } from "../auth";
+import { type Session, initSession, isStaff, signIn, signOut } from "../auth";
 import { AlertIcon, Spinner } from "../icons";
+import { loadStation } from "../station";
 import { StaffNav } from "./StaffNav";
 
 type State =
   | { status: "loading" }
   | { status: "signedOut" }
-  | { status: "signedIn"; account: AccountInfo }
+  | { status: "ready"; session: Session; onStation: boolean }
   | { status: "error"; message: string };
 
-const AccountContext = createContext<AccountInfo | null>(null);
+const SessionContext = createContext<Session | null>(null);
 
-/** The signed-in account. Only usable inside <AuthGate>. */
+/** Who is using the site. Only usable inside <AuthGate>. */
+export function useSession(): Session {
+  const session = useContext(SessionContext);
+  if (!session) throw new Error("useSession must be used inside <AuthGate>.");
+  return session;
+}
+
+/**
+ * The signed-in account. Only usable inside <AuthGate>, on pages a lab
+ * station can't reach (App.tsx only gives stations the queue).
+ */
 export function useAccount(): AccountInfo {
-  const account = useContext(AccountContext);
-  if (!account) throw new Error("useAccount must be used inside <AuthGate>.");
-  return account;
+  const session = useSession();
+  if (session.kind !== "user") {
+    throw new Error("useAccount needs someone signed in, not a lab station.");
+  }
+  return session.account;
 }
 
 /**
@@ -33,17 +46,21 @@ export function accountEmail(account: AccountInfo): string {
   return account.username.toLowerCase();
 }
 
-/** Renders its children only once the user has signed in with Entra ID. */
+/**
+ * Renders its children once someone has signed in with Entra ID, or, if
+ * nobody has, when this PC is a lab station.
+ */
 export function AuthGate({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>({ status: "loading" });
   const [redirecting, setRedirecting] = useState(false);
-  const [keepSignedIn, setKeepSignedIn] = useState(keepsSignedIn);
 
   useEffect(() => {
-    initAuth().then(
-      (account) =>
+    Promise.all([initSession(), loadStation()]).then(
+      ([session, station]) =>
         setState(
-          account ? { status: "signedIn", account } : { status: "signedOut" },
+          session
+            ? { status: "ready", session, onStation: station !== null }
+            : { status: "signedOut" },
         ),
       (err: unknown) =>
         setState({
@@ -67,22 +84,50 @@ export function AuthGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (state.status === "signedIn") {
+  if (state.status === "ready" && state.session.kind === "station") {
+    const { station } = state.session;
     return (
-      <AccountContext.Provider value={state.account}>
+      <SessionContext.Provider value={state.session}>
+        <header className="user-bar">
+          <h1 className="app-title">Innovation Center Laser Queue</h1>
+          <div className="user-info">
+            <span className="truncate">
+              <span className="signed-in-label">Lab station </span>
+              <strong>{station.name}</strong>
+            </span>
+            <span className="badge staff">STATION</span>
+            <button
+              type="button"
+              className="button secondary small"
+              // Always asks for a password: the last person to sign in here
+              // may still be remembered by Microsoft.
+              onClick={() => redirect(() => signIn({ fresh: true }))}
+              disabled={redirecting}
+            >
+              Staff sign in
+            </button>
+          </div>
+        </header>
+        {children}
+      </SessionContext.Provider>
+    );
+  }
+
+  if (state.status === "ready" && state.session.kind === "user") {
+    const { account } = state.session;
+    return (
+      <SessionContext.Provider value={state.session}>
         <header className="user-bar">
           {/* The h1 for every signed-in page; pages start at h2. */}
           <h1 className="app-title">Innovation Center Laser Queue</h1>
           {/* Students only have the submit page, so they get no nav. */}
-          {isStaff(state.account) && <StaffNav />}
+          {isStaff(account) && <StaffNav />}
           <div className="user-info">
             <span className="truncate">
               <span className="signed-in-label">Signed in as </span>
-              <strong>{state.account.name ?? state.account.username}</strong>
+              <strong>{account.name ?? account.username}</strong>
             </span>
-            {isStaff(state.account) && (
-              <span className="badge staff">STAFF</span>
-            )}
+            {isStaff(account) && <span className="badge staff">STAFF</span>}
             <button
               type="button"
               className="button secondary small"
@@ -93,8 +138,18 @@ export function AuthGate({ children }: { children: ReactNode }) {
             </button>
           </div>
         </header>
+        {state.onStation && (
+          <p className="station-reminder" role="note">
+            <AlertIcon />
+            <span>
+              This PC is a lab station.{" "}
+              <strong>Sign out when you're done</strong> so your UK account
+              isn't left signed in. The queue stays open after you do.
+            </span>
+          </p>
+        )}
         {children}
-      </AccountContext.Provider>
+      </SessionContext.Provider>
     );
   }
 
@@ -114,25 +169,14 @@ export function AuthGate({ children }: { children: ReactNode }) {
         <button
           type="button"
           className="button"
-          onClick={() => redirect(() => signIn({ keepSignedIn }))}
+          onClick={() => redirect(() => signIn())}
           disabled={redirecting}
         >
           {redirecting && <Spinner />}
           Sign in with linkblue
         </button>
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={keepSignedIn}
-            onChange={(event) => setKeepSignedIn(event.target.checked)}
-            disabled={redirecting}
-          />
-          Keep this computer signed in
-        </label>
         <p>
-          {keepSignedIn
-            ? "For the lab PC only. When Microsoft asks “Stay signed in?”, choose Yes. Sign out to turn this off."
-            : "You'll be sent to the UK Microsoft sign-in page and then back here."}
+          You'll be sent to the UK Microsoft sign-in page and then back here.
         </p>
       </section>
     </main>

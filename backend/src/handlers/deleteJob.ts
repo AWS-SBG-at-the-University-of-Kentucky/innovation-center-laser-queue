@@ -1,6 +1,5 @@
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
-import type { APIGatewayProxyHandlerV2WithJWTAuthorizer } from "aws-lambda";
-import { authorize } from "../lib/auth.js";
+import { type ApiHandler, authorize } from "../lib/auth.js";
 import { ddb } from "../lib/aws.js";
 import { config } from "../lib/config.js";
 import { error } from "../lib/http.js";
@@ -8,10 +7,11 @@ import { archiveJob } from "../lib/jobs.js";
 import type { JobRecord } from "../types.js";
 
 // DELETE /jobs/{jobId} (staff only)
+// DELETE /station/jobs/{jobId} (lab stations)
 // Deletes the file and the student's details, but keeps the job's timestamps
 // as an ArchivedJob so analytics can still count it.
-export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
-  const auth = authorize(event, { staffOnly: true });
+export const handler: ApiHandler = async (event) => {
+  const auth = authorize(event, { staffOnly: true, allowStation: true });
   if (!auth.ok) return auth.response;
 
   const jobId = event.pathParameters?.jobId;

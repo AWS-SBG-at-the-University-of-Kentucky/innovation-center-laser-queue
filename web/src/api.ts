@@ -1,4 +1,5 @@
-import { getAccessToken } from "./auth";
+import { getAccessToken, initSession } from "./auth";
+import { stationHeaders } from "./station";
 
 // Mirrors backend/src/types.ts — keep the two in sync.
 export const ALLOWED_EXTENSIONS = ["ai"] as const;
@@ -54,6 +55,23 @@ export interface Analytics {
   };
 }
 
+// Lab stations. Mirrors StationSummary in backend/src/types.ts — keep the two
+// in sync.
+export interface Station {
+  stationId: string;
+  name: string;
+  createdAt: string;
+  /** Name of the staff member who registered it. */
+  createdBy: string;
+  lastUsedAt?: string;
+  lastUsedIp?: string;
+}
+
+// Mirrors MAX_STATIONS and MAX_STATION_NAME_LENGTH in
+// backend/src/lib/stations.ts, which enforces them.
+export const MAX_STATIONS = 20;
+export const MAX_STATION_NAME_LENGTH = 60;
+
 // The student's name comes from their sign-in token.
 export interface CreateJobRequest {
   fileName: string;
@@ -69,16 +87,46 @@ export interface CreateJobResponse {
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+const STATION_REJECTED =
+  "This PC isn't a lab station anymore, or its clock is wrong. A staff member " +
+  "can sign in and register it again on the Stations page.";
+
+/**
+ * Calls the API as the signed-in user. With `stationAllowed`, a lab station
+ * with nobody signed in calls the same route under /station instead, signed
+ * with its key.
+ */
+async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  { stationAllowed = false }: { stationAllowed?: boolean } = {},
+): Promise<T> {
   const headers = new Headers(init.headers);
-  headers.set("authorization", `Bearer ${await getAccessToken()}`);
-  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
+  const session = stationAllowed ? await initSession() : null;
+  const station = session?.kind === "station" ? session.station : null;
+  const url = new URL(`${API_URL}${station ? "/station" : ""}${path}`);
+  if (station) {
+    const signed = await stationHeaders(station, init.method ?? "GET", url);
+    for (const [name, value] of Object.entries(signed)) {
+      headers.set(name, value);
+    }
+  } else {
+    headers.set("authorization", `Bearer ${await getAccessToken()}`);
+  }
+  const res = await fetch(url, { ...init, headers });
   const body = await res.json().catch(() => null);
   if (!res.ok) {
+    // The station authorizer can't say why it refused.
+    if (station && (res.status === 401 || res.status === 403)) {
+      throw new Error(STATION_REJECTED);
+    }
     throw new Error(body?.message ?? `Request failed (${res.status})`);
   }
   return body as T;
 }
+
+// Staff routes a lab station may also call.
+const STATION = { stationAllowed: true };
 
 export function createJob(input: CreateJobRequest) {
   return request<CreateJobResponse>("/jobs", {
@@ -119,16 +167,20 @@ export function getQueueLength() {
 }
 
 export function listJobs() {
-  return request<{ jobs: Job[] }>("/jobs");
+  return request<{ jobs: Job[] }>("/jobs", {}, STATION);
 }
 
 export function completeJob(jobId: string) {
-  return request<{ job: Job }>(`/jobs/${jobId}/complete`, { method: "POST" });
+  return request<{ job: Job }>(
+    `/jobs/${jobId}/complete`,
+    { method: "POST" },
+    STATION,
+  );
 }
 
 /** Removes the job and its file. The backend only allows this once completed. */
 export function deleteJob(jobId: string) {
-  return request<null>(`/jobs/${jobId}`, { method: "DELETE" });
+  return request<null>(`/jobs/${jobId}`, { method: "DELETE" }, STATION);
 }
 
 /** Usage counts for the analytics page. Staff only. */
@@ -137,5 +189,28 @@ export function getAnalytics() {
 }
 
 export function getDownloadUrl(jobId: string) {
-  return request<{ downloadUrl: string }>(`/jobs/${jobId}/download`);
+  return request<{ downloadUrl: string }>(
+    `/jobs/${jobId}/download`,
+    {},
+    STATION,
+  );
+}
+
+/** Lab stations, oldest first. Staff signed in only. */
+export function listStations() {
+  return request<{ stations: Station[] }>("/stations");
+}
+
+/** Registers this PC as a station, given its public key. Staff signed in only. */
+export function createStation(input: { name: string; publicKey: JsonWebKey }) {
+  return request<{ station: Station }>("/stations", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+/** Stops a station working, from its next request. Staff signed in only. */
+export function deleteStation(stationId: string) {
+  return request<null>(`/stations/${stationId}`, { method: "DELETE" });
 }

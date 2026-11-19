@@ -1,6 +1,5 @@
 import { ScanCommand } from "@aws-sdk/lib-dynamodb";
-import type { APIGatewayProxyHandlerV2WithJWTAuthorizer } from "aws-lambda";
-import { authorize } from "../lib/auth.js";
+import { type ApiHandler, authorize } from "../lib/auth.js";
 import { ddb } from "../lib/aws.js";
 import { config } from "../lib/config.js";
 import { json } from "../lib/http.js";
@@ -8,8 +7,9 @@ import { toSummary } from "../lib/jobs.js";
 import type { Job, JobSummary } from "../types.js";
 
 // GET /jobs (staff only)
-export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
-  const auth = authorize(event, { staffOnly: true });
+// GET /station/jobs (lab stations)
+export const handler: ApiHandler = async (event) => {
+  const auth = authorize(event, { staffOnly: true, allowStation: true });
   if (!auth.ok) return auth.response;
 
   const items: Job[] = [];

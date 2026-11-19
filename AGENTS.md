@@ -34,6 +34,15 @@ only lists rules and gotchas.
   Scheduled jobs (`backend/src/scheduled/`) have no caller and don't.
   The JWT authorizer only proves the token is valid; the handler checks the
   scope, guest status and `Staff` role. Never trust identity from the body.
+- Lab stations (the lab PC, no Microsoft sign-in) call `/station/*` routes
+  with the Lambda authorizer `backend/src/authorizers/station.ts`. A handler
+  only accepts them with `authorize(event, { staffOnly: true, allowStation:
+  true })`. Never give a station a route that isn't staff queue work, and
+  never cache that authorizer (revoking must be immediate).
+- The station signature format (`signedMessage()`) and header names are
+  duplicated in `backend/src/lib/stations.ts` and `web/src/station.ts`, and the
+  header names in `infra/lib/laser-queue-stack.ts`. Change all copies. The
+  `Station` type is duplicated in `backend/src/types.ts` and `web/src/api.ts`.
 - HTTP API JWT authorizers flatten array claims (`roles`) into strings like
   `"[Staff]"`. Use `listClaim()` in `lib/auth.ts`.
 

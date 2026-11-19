@@ -35,6 +35,7 @@ git-ignored.
 | AWS resources, limits, permissions | `infra/lib/laser-queue-stack.ts`        |
 | Analytics figures                | `backend/src/lib/analytics.ts` (daily counts), `web/src/analytics.ts` (weeks, months, records) |
 | Top-bar links for staff          | `web/src/components/StaffNav.tsx`        |
+| Lab stations                     | `web/src/station.ts` (key, signing), `backend/src/authorizers/station.ts`, `backend/src/lib/stations.ts` |
 | The weekly cleanup               | `backend/src/scheduled/cleanup.ts`; schedule and file backstop in the stack |
 
 ## Common changes
@@ -45,7 +46,8 @@ git-ignored.
    `handler: APIGatewayProxyHandlerV2WithJWTAuthorizer`. Copy an existing
    handler for the pattern. Start it with
    `authorize(event, { staffOnly: ... })` from `lib/auth.ts`, and use `json()`
-   and `error()` from `lib/http.ts` for responses.
+   and `error()` from `lib/http.ts` for responses. If the lab station should
+   reach it too, see "Let lab stations use a route" below.
 2. In `infra/lib/laser-queue-stack.ts`:
    - create the function with `handler("YourHandler", "yourHandler.ts")`,
    - grant only the access it needs (`table.grantReadData(...)`, etc.),
@@ -65,6 +67,15 @@ git-ignored.
    take it from the token (`authorize()` in `lib/auth.ts`) instead.
 4. Existing records won't have the field, so make it optional or handle it
    being missing.
+
+### Let lab stations use a route
+
+Only for staff routes the lab PC needs without anyone signed in. Type the
+handler as `ApiHandler` and call
+`authorize(event, { staffOnly: true, allowStation: true })`. In the stack, add
+the route to `stationRoutes` under `/station`. In `web/src/api.ts`, pass
+`STATION` to `request()`. The frontend then calls the `/station` path,
+signed, when the PC is a station.
 
 ### Change the weekly cleanup
 

@@ -1,7 +1,11 @@
 import * as path from "node:path";
 import * as cdk from "aws-cdk-lib";
 import * as apigwv2 from "aws-cdk-lib/aws-apigatewayv2";
-import { HttpJwtAuthorizer } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
+import {
+  HttpJwtAuthorizer,
+  HttpLambdaAuthorizer,
+  HttpLambdaResponseType,
+} from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as lambda from "aws-cdk-lib/aws-lambda";
@@ -30,6 +34,14 @@ const FILE_MAX_AGE_DAYS = 30;
 const ENTRA_TENANT_ID = "2b30530b-69b6-4457-b818-481cb53d42ae";
 const ENTRA_CLIENT_ID = "eae4e6cc-becd-41cb-906c-e68c5ea58ff0";
 
+// Headers a lab station signs its requests with. Mirrored in
+// backend/src/lib/stations.ts and web/src/station.ts.
+const STATION_HEADERS = [
+  "x-station-id",
+  "x-station-time",
+  "x-station-signature",
+];
+
 // Sites allowed to call the API and S3 from a browser: the Amplify app and the
 // Vite dev server. Each must also be a redirect URI on the app registration.
 const ALLOWED_ORIGINS = [
@@ -40,6 +52,7 @@ const ALLOWED_ORIGINS = [
 export class LaserQueueStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+    const isProd = this.node.tryGetContext("stage") === "prod";
 
     const bucket = new s3.Bucket(this, "JobFiles", {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -65,7 +78,7 @@ export class LaserQueueStack extends cdk.Stack {
     const table = new dynamodb.Table(this, "LaserJobs", {
       partitionKey: { name: "jobId", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      ...(this.node.tryGetContext("stage") === "prod"
+      ...(isProd
         ? {
             deletionProtection: true,
             pointInTimeRecoverySpecification: {
@@ -73,6 +86,14 @@ export class LaserQueueStack extends cdk.Stack {
             },
           }
         : {}),
+    });
+
+    // PCs allowed to use the queue without anyone signed in (the lab PC). Kept
+    // apart from LaserJobs so job scans never see them.
+    const stationsTable = new dynamodb.Table(this, "LabStations", {
+      partitionKey: { name: "stationId", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      deletionProtection: isProd,
     });
 
     const fn = (id: string, entry: string, timeout = cdk.Duration.seconds(10)) =>
@@ -83,6 +104,7 @@ export class LaserQueueStack extends cdk.Stack {
         timeout,
         environment: {
           TABLE_NAME: table.tableName,
+          STATIONS_TABLE_NAME: stationsTable.tableName,
           BUCKET_NAME: bucket.bucketName,
           MAX_FILE_SIZE_BYTES: String(MAX_FILE_SIZE_BYTES),
           URL_EXPIRY_SECONDS: String(URL_EXPIRY_SECONDS),
@@ -120,6 +142,17 @@ export class LaserQueueStack extends cdk.Stack {
     table.grantReadWriteData(deleteJob);
     bucket.grantDelete(deleteJob);
 
+    // Lab station management: staff signed in with Entra only.
+    const listStations = handler("ListStations", "listStations.ts");
+    stationsTable.grantReadData(listStations);
+
+    const createStation = handler("CreateStation", "createStation.ts");
+    // Read as well as write: it counts stations against the limit.
+    stationsTable.grantReadWriteData(createStation);
+
+    const deleteStation = handler("DeleteStation", "deleteStation.ts");
+    stationsTable.grantWriteData(deleteStation);
+
     // Weekly cleanup, Sundays at 3 AM in the lab's time zone. Archives jobs
     // exactly like DELETE /jobs/{jobId}, so it needs the same access.
     const cleanup = fn(
@@ -150,6 +183,26 @@ export class LaserQueueStack extends cdk.Stack {
       { jwtAudience: [ENTRA_CLIENT_ID] },
     );
 
+    // The /station/* routes are for the lab PC, which has no Microsoft sign-in.
+    // This checks the request was signed by a registered station's key
+    // (backend/src/authorizers/station.ts). Not cached, so removing a station
+    // takes effect on its next request.
+    const stationAuthorizerFn = fn(
+      "StationAuthorizer",
+      path.join(BACKEND_SRC, "authorizers/station.ts"),
+    );
+    // Write as well as read: it records when each station was last used.
+    stationsTable.grantReadWriteData(stationAuthorizerFn);
+    const stationAuthorizer = new HttpLambdaAuthorizer(
+      "LabStationAuthorizer",
+      stationAuthorizerFn,
+      {
+        responseTypes: [HttpLambdaResponseType.SIMPLE],
+        identitySource: STATION_HEADERS.map((h) => `$request.header.${h}`),
+        resultsCacheTtl: cdk.Duration.seconds(0),
+      },
+    );
+
     const api = new apigwv2.HttpApi(this, "Api", {
       defaultAuthorizer: authorizer,
       corsPreflight: {
@@ -159,7 +212,7 @@ export class LaserQueueStack extends cdk.Stack {
           apigwv2.CorsHttpMethod.POST,
           apigwv2.CorsHttpMethod.DELETE,
         ],
-        allowHeaders: ["authorization", "content-type"],
+        allowHeaders: ["authorization", "content-type", ...STATION_HEADERS],
       },
     });
 
@@ -210,6 +263,64 @@ export class LaserQueueStack extends cdk.Stack {
       methods: [apigwv2.HttpMethod.DELETE],
       integration: new HttpLambdaIntegration("DeleteJobIntegration", deleteJob),
     });
+
+    api.addRoutes({
+      path: "/stations",
+      methods: [apigwv2.HttpMethod.GET],
+      integration: new HttpLambdaIntegration(
+        "ListStationsIntegration",
+        listStations,
+      ),
+    });
+    api.addRoutes({
+      path: "/stations",
+      methods: [apigwv2.HttpMethod.POST],
+      integration: new HttpLambdaIntegration(
+        "CreateStationIntegration",
+        createStation,
+      ),
+    });
+    api.addRoutes({
+      path: "/stations/{stationId}",
+      methods: [apigwv2.HttpMethod.DELETE],
+      integration: new HttpLambdaIntegration(
+        "DeleteStationIntegration",
+        deleteStation,
+      ),
+    });
+
+    // The queue routes again, for lab stations. Same handlers; they call
+    // authorize() with allowStation. Each route needs its own integration:
+    // a shared one only grants API Gateway permission for its first path.
+    const stationRoutes = [
+      { path: "/station/jobs", method: apigwv2.HttpMethod.GET, target: listJobs },
+      {
+        path: "/station/jobs/{jobId}/download",
+        method: apigwv2.HttpMethod.GET,
+        target: getDownloadUrl,
+      },
+      {
+        path: "/station/jobs/{jobId}/complete",
+        method: apigwv2.HttpMethod.POST,
+        target: completeJob,
+      },
+      {
+        path: "/station/jobs/{jobId}",
+        method: apigwv2.HttpMethod.DELETE,
+        target: deleteJob,
+      },
+    ];
+    for (const route of stationRoutes) {
+      api.addRoutes({
+        path: route.path,
+        methods: [route.method],
+        authorizer: stationAuthorizer,
+        integration: new HttpLambdaIntegration(
+          `Station${route.target.node.id}Integration`,
+          route.target,
+        ),
+      });
+    }
 
     // Goes in web/.env.local as VITE_API_URL.
     new cdk.CfnOutput(this, "ApiUrl", { value: api.apiEndpoint });
